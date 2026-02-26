@@ -9,6 +9,7 @@ import { AppContext } from "$src/types";
 import auth from "$src/routes/auth";
 import { env } from '$env'
 import { debugMode } from "$src/middleware/debug";
+import { wordpressProxy } from '$src/middleware/wordpressProxy';
 
 const app = new Hono<AppContext>();
 
@@ -61,4 +62,6 @@ app.get("/health", async (c) => {
   }
 });
 
+
+app.use('/wp/*', wordpressProxy);
 export default app;

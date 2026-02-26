@@ -13,6 +13,7 @@ const EnvSchema = v.object({
 
     GOOGLE_CLIENT_ID: v.string('GOOGLE_CLIENT_ID is required'),
     DB_USE_SSL: v.optional(v.picklist(['true', 'false']), 'false'),
+    WP_API_BASE_URL: v.pipe(v.string(), v.url()),
 });
 
 type Env = v.InferOutput<typeof EnvSchema>;
