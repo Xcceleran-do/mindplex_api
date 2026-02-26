@@ -17,33 +17,32 @@ export async function generateAccessToken(payload: UserJwtPayload): Promise<stri
     return await new SignJWT({ ...payload })
         .setProtectedHeader({ alg: ALG })
         .setIssuedAt()
+        .setIssuer('mindplex')
+        .setAudience('mindplex-api')
         .setExpirationTime('15m')
-        .sign(JWT_SECRET);
-}
-
-export async function signToken(payload: UserJwtPayload, expiresIn = '7d'): Promise<string> {
-    return await new SignJWT({ ...payload })
-        .setProtectedHeader({ alg: ALG })
-        .setIssuedAt()
-        .setExpirationTime(expiresIn)
         .sign(JWT_SECRET);
 }
 
 
 export async function verifyToken(token: string): Promise<UserJwtPayload> {
     try {
-        const { payload } = await jwtVerify(token, JWT_SECRET);
+        const { payload } = await jwtVerify(token, JWT_SECRET, {
+            issuer: 'mindplex',
+            audience: 'mindplex-api',
+        });
         return payload as UserJwtPayload;
     } catch (error) {
         throw new Error('Invalid or expired token');
     }
 }
-export function generateRefreshToken() {
+
+export function generateOpaqueToken() {
     const rawToken = randomBytes(40).toString('hex');
     const hashedToken = createHash('sha256').update(rawToken).digest('hex');
 
     return { rawToken, hashedToken };
 }
+
 export function hashToken(rawToken: string): string {
     return createHash('sha256').update(rawToken).digest('hex');
 }

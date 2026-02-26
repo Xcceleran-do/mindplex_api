@@ -1,25 +1,35 @@
 import { Hono } from 'hono';
 import { eq, and } from 'drizzle-orm';
-import { generateAccessToken, generateRefreshToken, hashToken } from '$src/lib/jwt';
+import { generateAccessToken, generateOpaqueToken, hashToken } from '$src/lib/jwt';
 import type { AppContext } from '$src/types';
 import { validator } from 'hono-openapi';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
-
+import { users, userProfiles, userPreferences, userNotificationSettings, activationTokens, userSocialAuths, refreshTokens } from '$src/db/schema'
 import { Role } from '$src/db/schema';
 import { env } from '$env'
+
 import {
     LoginSchema, RegisterSchema, SocialLoginSchema, RefreshTokenSchema,
     loginDocs, registerDocs, socialLoginDocs, refreshDocs, logoutDocs,
+    ActivateAccountSchema,
+    activateDocs,
 } from './schema';
+
+const AUTH_PROVIDERS = {
+    GOOGLE: {
+        JWKS_URL: 'https://www.googleapis.com/oauth2/v3/certs',
+        ISSUERS: ['https://accounts.google.com', 'accounts.google.com']
+    }
+} as const;
 
 
 const auth = new Hono<AppContext>();
 
-const googleJWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
+const googleJWKS = createRemoteJWKSet(new URL(AUTH_PROVIDERS.GOOGLE.JWKS_URL));
 
 auth.post('/login', loginDocs, validator('json', LoginSchema), async (c) => {
     const db = c.get('db');
-    const { users, refreshTokens } = c.get('schema');
+
     const { email, password } = c.req.valid('json');
 
     const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
@@ -34,7 +44,11 @@ auth.post('/login', loginDocs, validator('json', LoginSchema), async (c) => {
         return c.json({ error: 'Invalid credentials' }, 401);
     }
 
-    const { rawToken, hashedToken } = generateRefreshToken();
+    if (!user.isActivated) {
+        return c.json({ error: 'Account not activated' }, 403);
+    }
+
+    const { rawToken, hashedToken } = generateOpaqueToken();
     const familyId = crypto.randomUUID();
 
     const accessToken = await generateAccessToken({
@@ -43,9 +57,6 @@ auth.post('/login', loginDocs, validator('json', LoginSchema), async (c) => {
         role: user.role,
         sessionId: familyId
     });
-
-    const idleExpiresAt = new Date();
-    idleExpiresAt.setDate(idleExpiresAt.getDate() + 7);
 
     const familyExpiresAt = new Date();
     familyExpiresAt.setDate(familyExpiresAt.getDate() + 30);
@@ -67,7 +78,6 @@ auth.post('/login', loginDocs, validator('json', LoginSchema), async (c) => {
 
 auth.post('/register', registerDocs, validator('json', RegisterSchema), async (c) => {
     const db = c.get('db');
-    const { users, userProfiles, userPreferences, userNotificationSettings } = c.get('schema');
     const { email, password, username } = c.req.valid('json');
 
     const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
@@ -81,9 +91,14 @@ auth.post('/register', registerDocs, validator('json', RegisterSchema), async (c
         memoryCost: 65536, // 64MB memory usage per hash 
         timeCost: 2
     });
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+
+    const { hashedToken, rawToken } = generateOpaqueToken()
 
     try {
         await db.transaction(async (tx) => {
+
             const [newUser] = await tx.insert(users).values({
                 username,
                 email,
@@ -93,9 +108,16 @@ auth.post('/register', registerDocs, validator('json', RegisterSchema), async (c
             await tx.insert(userProfiles).values({ userId: newUser.id });
             await tx.insert(userPreferences).values({ userId: newUser.id });
             await tx.insert(userNotificationSettings).values({ userId: newUser.id });
-        });
 
-        return c.json({ message: 'User registered successfully' }, 201);
+            await tx.insert(activationTokens).values({
+                userId: newUser.id,
+                token: hashedToken,
+                expiresAt,
+            });
+        });
+        // TODO: Send email with `rawToken`
+        // await sendEmail(email, `https://mindplex.ai/activate?token=${rawToken}`);
+        return c.json({ message: 'User registered. Please check your email to activate.' }, 201);
     } catch (error: any) {
 
         if (error.code === '23505') {
@@ -105,9 +127,48 @@ auth.post('/register', registerDocs, validator('json', RegisterSchema), async (c
     }
 })
 
+auth.post('/activate', activateDocs, validator('json', ActivateAccountSchema), async (c) => {
+    const db = c.get('db');
+    const { token: rawIncomingToken } = c.req.valid('json');
+
+    const hashedIncomingToken = hashToken(rawIncomingToken);
+
+    const [record] = await db.select()
+        .from(activationTokens)
+        .innerJoin(users, eq(activationTokens.userId, users.id))
+        .where(eq(activationTokens.token, hashedIncomingToken))
+        .limit(1);
+
+    if (!record) {
+        return c.json({ error: 'Invalid activation token' }, 400);
+    }
+
+    if (new Date(record.activation_tokens.expiresAt) < new Date()) {
+        await db.delete(activationTokens).where(eq(activationTokens.id, record.activation_tokens.id));
+        return c.json({ error: 'Token expired. Please request a new one.' }, 400);
+    }
+
+    const user = record.users;
+
+    if (user.isActivated) {
+        return c.json({ message: 'Account is already activated' });
+    }
+
+    await db.transaction(async (tx) => {
+        await tx.update(users)
+            .set({ isActivated: true })
+            .where(eq(users.id, user.id));
+
+        await tx.delete(activationTokens)
+            .where(eq(activationTokens.id, record.activation_tokens.id));
+    });
+
+    return c.json({ message: 'Account successfully activated' });
+});
+
 auth.post('/social', socialLoginDocs, validator('json', SocialLoginSchema), async (c) => {
     const db = c.get('db');
-    const schema = c.get('schema');
+
     const { provider, idToken, referralCode } = c.req.valid('json');
 
     let verifiedEmail: string;
@@ -119,8 +180,7 @@ auth.post('/social', socialLoginDocs, validator('json', SocialLoginSchema), asyn
     try {
         if (provider === 'google') {
             const { payload } = await jwtVerify(idToken, googleJWKS, {
-
-                issuer: ['https://accounts.google.com', 'accounts.google.com'],
+                issuer: [...AUTH_PROVIDERS.GOOGLE.ISSUERS],
                 audience: env.GOOGLE_CLIENT_ID
             });
 
@@ -148,29 +208,29 @@ auth.post('/social', socialLoginDocs, validator('json', SocialLoginSchema), asyn
 
     await db.transaction(async (tx) => {
         const [existingAuth] = await tx.select()
-            .from(schema.userSocialAuths)
+            .from(userSocialAuths)
             .where(and(
-                eq(schema.userSocialAuths.provider, provider),
-                eq(schema.userSocialAuths.providerId, providerId)
+                eq(userSocialAuths.provider, provider),
+                eq(userSocialAuths.providerId, providerId)
             )).limit(1);
 
         if (existingAuth) {
             finalUserId = existingAuth.userId;
-            const [u] = await tx.select({ role: schema.users.role })
-                .from(schema.users).where(eq(schema.users.id, finalUserId));
+            const [u] = await tx.select({ role: users.role })
+                .from(users).where(eq(users.id, finalUserId));
             userRole = u.role;
             return;
         }
 
         const [existingUser] = await tx.select()
-            .from(schema.users)
-            .where(eq(schema.users.email, verifiedEmail)).limit(1);
+            .from(users)
+            .where(eq(users.email, verifiedEmail)).limit(1);
 
         if (existingUser) {
             finalUserId = existingUser.id;
             userRole = existingUser.role;
 
-            await tx.insert(schema.userSocialAuths).values({
+            await tx.insert(userSocialAuths).values({
                 userId: finalUserId,
                 provider,
                 providerId,
@@ -181,23 +241,23 @@ auth.post('/social', socialLoginDocs, validator('json', SocialLoginSchema), asyn
         const baseUsername = verifiedEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '');
         const uniqueUsername = `${baseUsername}_${crypto.randomUUID().split('-')[0]}`;
 
-        const [newUser] = await tx.insert(schema.users).values({
+        const [newUser] = await tx.insert(users).values({
             username: uniqueUsername,
             email: verifiedEmail,
             isActivated: true,
-        }).returning({ id: schema.users.id });
+        }).returning({ id: users.id });
 
         finalUserId = newUser.id;
 
-        await tx.insert(schema.userProfiles).values({
+        await tx.insert(userProfiles).values({
             userId: finalUserId,
             firstName,
             lastName,
             avatarUrl,
         });
-        await tx.insert(schema.userPreferences).values({ userId: finalUserId });
-        await tx.insert(schema.userNotificationSettings).values({ userId: finalUserId });
-        await tx.insert(schema.userSocialAuths).values({
+        await tx.insert(userPreferences).values({ userId: finalUserId });
+        await tx.insert(userNotificationSettings).values({ userId: finalUserId });
+        await tx.insert(userSocialAuths).values({
             userId: finalUserId,
             provider,
             providerId,
@@ -212,7 +272,7 @@ auth.post('/social', socialLoginDocs, validator('json', SocialLoginSchema), asyn
         sessionId: familyId
     });
 
-    const { rawToken: refreshToken, hashedToken } = generateRefreshToken();
+    const { rawToken: refreshToken, hashedToken } = generateOpaqueToken();
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
@@ -222,7 +282,7 @@ auth.post('/social', socialLoginDocs, validator('json', SocialLoginSchema), asyn
     const userAgent = c.req.header('user-agent') || 'Unknown Device';
     const ip = c.req.header('x-forwarded-for') || 'Unknown IP';
 
-    await db.insert(schema.refreshTokens).values({
+    await db.insert(refreshTokens).values({
         userId: finalUserId!,
         token: hashedToken,
         familyId,
@@ -234,9 +294,9 @@ auth.post('/social', socialLoginDocs, validator('json', SocialLoginSchema), asyn
     return c.json({ accessToken, refreshToken });
 });
 
-auth.post('/refresh', registerDocs, validator('json', RefreshTokenSchema), async (c) => {
+auth.post('/refresh', refreshDocs, validator('json', RefreshTokenSchema), async (c) => {
     const db = c.get('db');
-    const { users, refreshTokens } = c.get('schema');
+
     const { refreshToken: rawIncomingToken } = c.req.valid('json');
 
     const hashedIncomingToken = hashToken(rawIncomingToken);
@@ -269,7 +329,6 @@ auth.post('/refresh', registerDocs, validator('json', RefreshTokenSchema), async
         return c.json({ error: 'Security alert: Token reuse detected. Please log in again.' }, 403);
     }
 
-
     const newAccessToken = await generateAccessToken({
         sub: String(user.id),
         email: user.email,
@@ -277,7 +336,7 @@ auth.post('/refresh', registerDocs, validator('json', RefreshTokenSchema), async
         sessionId: tokenData.familyId
     });
 
-    const { rawToken: newRawToken, hashedToken: newHashedToken } = generateRefreshToken();
+    const { rawToken: newRawToken, hashedToken: newHashedToken } = generateOpaqueToken();
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
@@ -306,7 +365,6 @@ auth.post('/refresh', registerDocs, validator('json', RefreshTokenSchema), async
 
 auth.post('/logout', logoutDocs, validator('json', RefreshTokenSchema), async (c) => {
     const db = c.get('db');
-    const { refreshTokens } = c.get('schema');
     const { refreshToken: rawToken } = c.req.valid('json');
 
     const hashedToken = hashToken(rawToken);

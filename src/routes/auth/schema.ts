@@ -31,19 +31,24 @@ export const RefreshTokenSchema = v.object({
     ),
 });
 
-const TokenResponse = v.object({
+export const ActivateAccountSchema = v.object({
+    token: v.pipe(v.string('Activation token is required'),
+        v.minLength(1, 'Activation token cannot be empty')
+    ),
+});
+
+export const TokenResponseSchema = v.object({
     accessToken: v.string(),
     refreshToken: v.string(),
 });
 
-const ErrorResponse = v.object({
-    error: v.string(),
-});
-
-const MessageResponse = v.object({
+export const MessageResponseSchema = v.object({
     message: v.string(),
 });
 
+export const ErrorResponseSchema = v.object({
+    error: v.string(),
+});
 
 export const loginDocs = describeRoute({
     tags: ['Auth'],
@@ -52,47 +57,67 @@ export const loginDocs = describeRoute({
     responses: {
         200: {
             description: 'Successful login',
-            content: { 'application/json': { schema: resolver(TokenResponse) } },
+            content: { 'application/json': { schema: resolver(TokenResponseSchema) } },
         },
         401: {
             description: 'Invalid credentials',
-            content: { 'application/json': { schema: resolver(ErrorResponse) } },
+            content: { 'application/json': { schema: resolver(ErrorResponseSchema) } },
         },
+        403: {
+            description: 'Account not activated',
+            content: { 'application/json': { schema: resolver(ErrorResponseSchema) } },
+        }
     },
 });
 
 export const registerDocs = describeRoute({
     tags: ['Auth'],
     summary: 'Register a new user',
-    description: 'Creates a new user account with profile, preferences, and notification settings.',
+    description: 'Creates a new user account and dispatches an activation email.',
     responses: {
         201: {
             description: 'User registered successfully',
-            content: { 'application/json': { schema: resolver(MessageResponse) } },
+            content: { 'application/json': { schema: resolver(MessageResponseSchema) } },
         },
         409: {
-            description: 'User already exists',
-            content: { 'application/json': { schema: resolver(ErrorResponse) } },
+            description: 'Username or email already exists',
+            content: { 'application/json': { schema: resolver(ErrorResponseSchema) } },
+        },
+    },
+});
+
+export const activateDocs = describeRoute({
+    tags: ['Auth'],
+    summary: 'Activate account',
+    description: 'Verifies the email activation token and activates the user account.',
+    responses: {
+        200: {
+            description: 'Account successfully activated',
+            content: { 'application/json': { schema: resolver(MessageResponseSchema) } },
+        },
+        400: {
+            description: 'Invalid or expired token',
+            content: { 'application/json': { schema: resolver(ErrorResponseSchema) } },
         },
     },
 });
 
 export const socialLoginDocs = describeRoute({
     tags: ['Auth'],
-    summary: 'Social login (Google)',
+    summary: 'Social login (Google/Github)',
     description: 'Authenticates via a social provider ID token. Creates an account on first login.',
     responses: {
         200: {
             description: 'Successful authentication',
-            content: { 'application/json': { schema: resolver(TokenResponse) } },
+            content: { 'application/json': { schema: resolver(TokenResponseSchema) } },
         },
         401: {
             description: 'Invalid or expired social token',
-            content: { 'application/json': { schema: resolver(ErrorResponse) } },
+            content: { 'application/json': { schema: resolver(ErrorResponseSchema) } },
         },
         501: {
             description: 'Provider not implemented',
-            content: { 'application/json': { schema: resolver(ErrorResponse) } },
+            content: { 'application/json': { schema: resolver(ErrorResponseSchema) } },
         },
     },
 });
@@ -104,15 +129,15 @@ export const refreshDocs = describeRoute({
     responses: {
         200: {
             description: 'Tokens refreshed',
-            content: { 'application/json': { schema: resolver(TokenResponse) } },
+            content: { 'application/json': { schema: resolver(TokenResponseSchema) } },
         },
         401: {
             description: 'Invalid or expired token',
-            content: { 'application/json': { schema: resolver(ErrorResponse) } },
+            content: { 'application/json': { schema: resolver(ErrorResponseSchema) } },
         },
         403: {
             description: 'Token reuse detected — session terminated',
-            content: { 'application/json': { schema: resolver(ErrorResponse) } },
+            content: { 'application/json': { schema: resolver(ErrorResponseSchema) } },
         },
     },
 });
@@ -120,11 +145,11 @@ export const refreshDocs = describeRoute({
 export const logoutDocs = describeRoute({
     tags: ['Auth'],
     summary: 'Logout',
-    description: 'Invalidates the entire token family associated with the refresh token.',
+    description: 'Invalidates the entire token family associated with the active session.',
     responses: {
         200: {
             description: 'Logged out successfully',
-            content: { 'application/json': { schema: resolver(MessageResponse) } },
+            content: { 'application/json': { schema: resolver(MessageResponseSchema) } },
         },
     },
 });
