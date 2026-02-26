@@ -8,6 +8,13 @@
       "when": 1772097374539,
       "tag": "0000_tidy_scalphunter",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772108482805,
+      "tag": "0001_public_human_torch",
+      "breakpoints": true
     }
   ]
 }

@@ -7,5 +7,6 @@ export type AppContext = {
         db: NodePgDatabase<typeof schema>
         schema: typeof schema
         user: UserJwtPayload;
+        debugData: Record<string, any>;
     };
 };

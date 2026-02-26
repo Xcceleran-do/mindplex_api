@@ -22,7 +22,6 @@ const AUTH_PROVIDERS = {
     }
 } as const;
 
-
 const auth = new Hono<AppContext>();
 
 const googleJWKS = createRemoteJWKSet(new URL(AUTH_PROVIDERS.GOOGLE.JWKS_URL));
@@ -35,6 +34,7 @@ auth.post('/login', loginDocs, validator('json', LoginSchema), async (c) => {
     const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
     if (!user || !user.passwordHash) {
+        c.get('debugData').userNotFound = true;
         return c.json({ error: 'Invalid credentials' }, 401);
     }
 
@@ -115,6 +115,7 @@ auth.post('/register', registerDocs, validator('json', RegisterSchema), async (c
                 expiresAt,
             });
         });
+        c.get('debugData').activationToken = rawToken;
         // TODO: Send email with `rawToken`
         // await sendEmail(email, `https://mindplex.ai/activate?token=${rawToken}`);
         return c.json({ message: 'User registered. Please check your email to activate.' }, 201);

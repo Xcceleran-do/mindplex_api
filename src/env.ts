@@ -12,6 +12,7 @@ const EnvSchema = v.object({
     ),
 
     GOOGLE_CLIENT_ID: v.string('GOOGLE_CLIENT_ID is required'),
+    DB_USE_SSL: v.optional(v.picklist(['true', 'false']), 'false'),
 });
 
 type Env = v.InferOutput<typeof EnvSchema>;

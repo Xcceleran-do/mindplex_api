@@ -7,19 +7,19 @@ import * as schema from '$src/db/schema'
 import { registerDocs } from "$src/lib/openapi";
 import { AppContext } from "$src/types";
 import auth from "$src/routes/auth";
+import { env } from '$env'
+import { debugMode } from "$src/middleware/debug";
 
 const app = new Hono<AppContext>();
-const urlObj = new URL(process.env.DATABASE_URL || "");
-const isLocal =
-  urlObj.hostname === "localhost" || urlObj.hostname === "127.0.0.1";
+
+const ssl = env.DB_USE_SSL === 'true' ? {
+  rejectUnauthorized: false,
+} : false
+
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: isLocal
-    ? false
-    : {
-      rejectUnauthorized: false,
-    },
+  connectionString: env.DATABASE_URL,
+  ssl: ssl
 });
 
 const db = drizzle({ schema, client: pool });
@@ -31,6 +31,7 @@ const dbMiddleware = createMiddleware(async (c, next) => {
 });
 
 app.use(dbMiddleware);
+app.use('*', debugMode);
 
 registerDocs(app);
 
