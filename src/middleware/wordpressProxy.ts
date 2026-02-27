@@ -1,4 +1,3 @@
-// src/middleware/proxy.ts
 import { createMiddleware } from 'hono/factory';
 import { env } from '$env';
 import type { AppContext } from '$src/types';

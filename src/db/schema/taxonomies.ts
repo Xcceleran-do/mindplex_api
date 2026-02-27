@@ -1,0 +1,78 @@
+import { relations } from "drizzle-orm";
+import {
+    pgTable,
+    serial,
+    varchar,
+    text,
+    boolean,
+    timestamp,
+    integer,
+    unique,
+    index,
+} from "drizzle-orm/pg-core";
+import { posts } from "./posts";
+import type { TaxonomyType } from "./types";
+
+export const taxonomies = pgTable("taxonomies", {
+    id: serial("id").primaryKey(),
+    name: varchar("name", { length: 200 }).notNull(),
+    slug: varchar("slug", { length: 200 }).unique().notNull(),
+    type: varchar("type", { length: 32 })
+        .$type<TaxonomyType>()
+        .notNull(),
+    description: text("description"),
+    parentId: integer("parent_id").references((): any => taxonomies.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+        .defaultNow()
+        .notNull(),
+},
+    (table) => [
+        index("taxonomies_type_idx").on(table.type),
+        index("taxonomies_slug_idx").on(table.slug),
+        index("taxonomies_parent_id_idx").on(table.parentId),
+    ]
+);
+
+
+export const postTaxonomies = pgTable("post_taxonomies", {
+    postId: integer("post_id")
+        .notNull()
+        .references(() => posts.id, { onDelete: "cascade" }),
+    taxonomyId: integer("taxonomy_id")
+        .notNull()
+        .references(() => taxonomies.id, { onDelete: "cascade" }),
+    isPrimary: boolean("is_primary").default(false),
+},
+    (table) => [
+        unique("post_taxonomies_pk").on(table.postId, table.taxonomyId),
+        index("post_taxonomies_taxonomy_id_idx").on(table.taxonomyId),
+    ]
+);
+
+
+export const taxonomiesRelations = relations(
+    taxonomies,
+    ({ one, many }) => ({
+        parent: one(taxonomies, {
+            fields: [taxonomies.parentId],
+            references: [taxonomies.id],
+            relationName: "taxonomyHierarchy",
+        }),
+        children: many(taxonomies, { relationName: "taxonomyHierarchy" }),
+        posts: many(postTaxonomies),
+    })
+);
+
+export const postTaxonomiesRelations = relations(
+    postTaxonomies,
+    ({ one }) => ({
+        post: one(posts, {
+            fields: [postTaxonomies.postId],
+            references: [posts.id],
+        }),
+        taxonomy: one(taxonomies, {
+            fields: [postTaxonomies.taxonomyId],
+            references: [taxonomies.id],
+        }),
+    })
+);
