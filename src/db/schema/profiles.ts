@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import {
     pgTable,
     serial,
@@ -41,17 +40,3 @@ export const userEducation = pgTable("user_educations", {
 },
     (table) => [index("user_educations_user_id_idx").on(table.userId)]
 );
-
-export const userInterestsRelations = relations(userInterests, ({ one }) => ({
-    user: one(users, {
-        fields: [userInterests.userId],
-        references: [users.id],
-    }),
-}));
-
-export const userEducationRelations = relations(userEducation, ({ one }) => ({
-    user: one(users, {
-        fields: [userEducation.userId],
-        references: [users.id],
-    }),
-}));

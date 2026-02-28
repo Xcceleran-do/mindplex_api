@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import {
     pgTable,
     serial,
@@ -12,23 +11,6 @@ import {
     unique,
 } from "drizzle-orm/pg-core";
 import { PrivacyLevel, Role, SocialAuthProvider, SocialMedia, Theme } from "./types";
-import { posts, postAuthors } from "./posts";
-import { comments, commentClassifications } from "./comments";
-import {
-    follows,
-    friendRequests,
-    postReactions,
-    commentReactions,
-    postEmojis,
-    bookmarks,
-    shares,
-    peoplesChoiceVotes
-} from "./socials";
-import { interactions, readingSessions } from "./reputations";
-import { polls, pollVotes } from "./polls";
-import { userWallets } from "./blockchains";
-import { userInterests, userEducation } from "./profiles";
-import { notifications } from "./notifications";
 
 type SessionMetadata = {
     ip?: string;
@@ -144,50 +126,3 @@ export const activationTokens = pgTable('activation_tokens', {
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const usersRelations = relations(users, ({ one, many }) => ({
-    profile: one(userProfiles, {
-        fields: [users.id],
-        references: [userProfiles.userId],
-    }),
-    preferences: one(userPreferences, {
-        fields: [users.id],
-        references: [userPreferences.userId],
-    }),
-    notificationSettings: one(userNotificationSettings, {
-        fields: [users.id],
-        references: [userNotificationSettings.userId],
-    }),
-    socialAuths: many(userSocialAuths),
-    refreshTokens: many(refreshTokens),
-    activationTokens: many(activationTokens),
-
-    posts: many(posts),
-    coAuthoredPosts: many(postAuthors),
-
-    comments: many(comments),
-    commentClassifications: many(commentClassifications),
-
-    followers: many(follows, { relationName: "followers" }),
-    following: many(follows, { relationName: "following" }),
-    sentFriendRequests: many(friendRequests, { relationName: "sentFriendRequests" }),
-    receivedFriendRequests: many(friendRequests, { relationName: "receivedFriendRequests" }),
-    postReactions: many(postReactions),
-    commentReactions: many(commentReactions),
-    postEmojis: many(postEmojis),
-    bookmarks: many(bookmarks),
-    shares: many(shares),
-    peoplesChoiceVotes: many(peoplesChoiceVotes),
-
-    interactions: many(interactions),
-    readingSessions: many(readingSessions),
-
-    createdPolls: many(polls),
-    pollVotes: many(pollVotes),
-
-    wallets: many(userWallets),
-
-    interests: many(userInterests),
-    education: many(userEducation),
-
-    notifications: many(notifications),
-}));

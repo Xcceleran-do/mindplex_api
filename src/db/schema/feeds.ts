@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import {
     pgTable,
     serial,
@@ -54,12 +53,3 @@ export const contentSourceReactions = pgTable("content_source_reactions", {
     ]
 );
 
-export const contentSourcesRelations = relations(
-    contentSources,
-    ({ one }) => ({
-        user: one(users, {
-            fields: [contentSources.userId],
-            references: [users.id],
-        }),
-    })
-);

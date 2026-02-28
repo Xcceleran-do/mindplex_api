@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import {
     pgTable,
     serial,
@@ -196,66 +195,3 @@ export const peoplesChoiceVotes = pgTable("peoples_choice_votes", {
         unique("peoples_choice_user_post_idx").on(table.userId, table.postId),
     ]
 );
-
-export const followsRelations = relations(follows, ({ one }) => ({
-    follower: one(users, {
-        fields: [follows.followerId],
-        references: [users.id],
-        relationName: "followers",
-    }),
-    following: one(users, {
-        fields: [follows.followingId],
-        references: [users.id],
-        relationName: "following",
-    }),
-}));
-
-export const friendRequestsRelations = relations(
-    friendRequests,
-    ({ one }) => ({
-        requester: one(users, {
-            fields: [friendRequests.requesterId],
-            references: [users.id],
-        }),
-        requested: one(users, {
-            fields: [friendRequests.requestedId],
-            references: [users.id],
-        }),
-    })
-);
-
-export const postReactionsRelations = relations(postReactions, ({ one }) => ({
-    post: one(posts, {
-        fields: [postReactions.postId],
-        references: [posts.id],
-    }),
-    user: one(users, {
-        fields: [postReactions.userId],
-        references: [users.id],
-    }),
-}));
-
-export const commentReactionsRelations = relations(
-    commentReactions,
-    ({ one }) => ({
-        comment: one(comments, {
-            fields: [commentReactions.commentId],
-            references: [comments.id],
-        }),
-        user: one(users, {
-            fields: [commentReactions.userId],
-            references: [users.id],
-        }),
-    })
-);
-
-export const bookmarksRelations = relations(bookmarks, ({ one }) => ({
-    post: one(posts, {
-        fields: [bookmarks.postId],
-        references: [posts.id],
-    }),
-    user: one(users, {
-        fields: [bookmarks.userId],
-        references: [users.id],
-    }),
-}));

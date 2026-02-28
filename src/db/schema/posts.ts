@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import {
     pgTable,
     serial,
@@ -109,22 +108,3 @@ export const media = pgTable(
     },
     (table) => [index("media_uploader_id_idx").on(table.uploaderId)]
 );
-
-export const postsRelations = relations(posts, ({ one, many }) => ({
-    author: one(users, {
-        fields: [posts.authorId],
-        references: [users.id],
-    }),
-    coAuthors: many(postAuthors),
-}));
-
-export const postAuthorsRelations = relations(postAuthors, ({ one }) => ({
-    post: one(posts, {
-        fields: [postAuthors.postId],
-        references: [posts.id],
-    }),
-    user: one(users, {
-        fields: [postAuthors.userId],
-        references: [users.id],
-    }),
-}));

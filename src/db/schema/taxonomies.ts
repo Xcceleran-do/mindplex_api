@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import {
     pgTable,
     serial,
@@ -49,30 +48,3 @@ export const postTaxonomies = pgTable("post_taxonomies", {
     ]
 );
 
-
-export const taxonomiesRelations = relations(
-    taxonomies,
-    ({ one, many }) => ({
-        parent: one(taxonomies, {
-            fields: [taxonomies.parentId],
-            references: [taxonomies.id],
-            relationName: "taxonomyHierarchy",
-        }),
-        children: many(taxonomies, { relationName: "taxonomyHierarchy" }),
-        posts: many(postTaxonomies),
-    })
-);
-
-export const postTaxonomiesRelations = relations(
-    postTaxonomies,
-    ({ one }) => ({
-        post: one(posts, {
-            fields: [postTaxonomies.postId],
-            references: [posts.id],
-        }),
-        taxonomy: one(taxonomies, {
-            fields: [postTaxonomies.taxonomyId],
-            references: [taxonomies.id],
-        }),
-    })
-);

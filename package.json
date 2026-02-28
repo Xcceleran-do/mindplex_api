@@ -9,19 +9,17 @@
     "db:setup": "bun run src/scripts/bootstrap.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-bedrock-runtime": "^3.943.0",
     "@hono/standard-validator": "^0.2.2",
     "@hono/valibot-validator": "^0.6.1",
     "@scalar/hono-api-reference": "^0.9.45",
     "@types/pg": "^8.15.6",
     "@valibot/to-json-schema": "^1.5.0",
     "destr": "^2.0.5",
-    "drizzle-kit": "^0.31.7",
-    "drizzle-orm": "^0.44.7",
+    "drizzle-kit": "^1.0.0-beta.15-859cf75",
+    "drizzle-orm": "^1.0.0-beta.15-859cf75",
     "hono": "^4.10.7",
     "hono-openapi": "^1.2.0",
     "jose": "^6.1.3",
-    "jsdom": "^27.2.0",
     "pg": "^8.16.3",
     "valibot": "^1.2.0"
   },

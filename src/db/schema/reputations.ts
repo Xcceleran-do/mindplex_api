@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import {
     pgTable,
     varchar,
@@ -83,24 +82,3 @@ export const readingSessions = pgTable("reading_sessions", {
     ]
 );
 
-
-export const interactionsRelations = relations(interactions, ({ one }) => ({
-    user: one(users, {
-        fields: [interactions.userId],
-        references: [users.id],
-    }),
-}));
-
-export const readingSessionsRelations = relations(
-    readingSessions,
-    ({ one }) => ({
-        post: one(posts, {
-            fields: [readingSessions.postId],
-            references: [posts.id],
-        }),
-        user: one(users, {
-            fields: [readingSessions.userId],
-            references: [users.id],
-        }),
-    })
-);

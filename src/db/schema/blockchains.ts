@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import {
     pgTable,
     serial,
@@ -35,10 +34,3 @@ export const userWallets = pgTable("user_wallets", {
         index("user_wallets_public_address_idx").on(table.publicAddress),
     ]
 );
-
-export const userWalletsRelations = relations(userWallets, ({ one }) => ({
-    user: one(users, {
-        fields: [userWallets.userId],
-        references: [users.id],
-    }),
-}));

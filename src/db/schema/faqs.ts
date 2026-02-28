@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import {
     pgTable,
     serial,
@@ -46,23 +45,3 @@ export const faqQuestions = pgTable("faq_questions", {
 },
     (table) => [index("faq_questions_category_id_idx").on(table.categoryId)]
 );
-
-export const faqCategoriesRelations = relations(
-    faqCategories,
-    ({ one, many }) => ({
-        parent: one(faqCategories, {
-            fields: [faqCategories.parentId],
-            references: [faqCategories.id],
-            relationName: "faqCategoryHierarchy",
-        }),
-        children: many(faqCategories, { relationName: "faqCategoryHierarchy" }),
-        questions: many(faqQuestions),
-    })
-);
-
-export const faqQuestionsRelations = relations(faqQuestions, ({ one }) => ({
-    category: one(faqCategories, {
-        fields: [faqQuestions.categoryId],
-        references: [faqCategories.id],
-    }),
-}));

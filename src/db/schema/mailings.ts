@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import {
     pgTable,
     serial,
@@ -96,26 +95,4 @@ export const emailDeliveries = pgTable("email_deliveries", {
         index("email_deliveries_campaign_id_idx").on(table.campaignId),
         index("email_deliveries_status_idx").on(table.status),
     ]
-);
-
-
-export const emailCampaignsRelations = relations(
-    emailCampaigns,
-    ({ one, many }) => ({
-        sentBy: one(users, {
-            fields: [emailCampaigns.sentById],
-            references: [users.id],
-        }),
-        deliveries: many(emailDeliveries),
-    })
-);
-
-export const emailDeliveriesRelations = relations(
-    emailDeliveries,
-    ({ one }) => ({
-        campaign: one(emailCampaigns, {
-            fields: [emailDeliveries.campaignId],
-            references: [emailCampaigns.id],
-        }),
-    })
 );
