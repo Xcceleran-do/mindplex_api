@@ -1,7 +1,43 @@
-export type Role = "user" | "admin" | "moderator" | "collaborator" | "editor";
-export type Theme = "light" | "dark" | "system";
-export type PrivacyLevel = "public" | "private" | "followersOnly";
-export type SocialAuthProvider = "google" | "apple" | "facebook";
+export const ROLE = {
+    User: "user",
+    Admin: "admin",
+    Moderator: "moderator",
+    Collaborator: "collaborator",
+    Editor: "editor",
+} as const;
+
+export const ACCESS = {
+    Public: "*",
+    ...ROLE
+} as const;
+
+export const ROLE_HIERARCHY = [
+    ACCESS.Public,
+    ROLE.User,
+    ROLE.Collaborator,
+    ROLE.Editor,
+    ROLE.Moderator,
+    ROLE.Admin,
+] as const;
+
+export const THEME = {
+    Light: "light",
+    Dark: "dark",
+    System: "system",
+} as const;
+
+export const PRIVACY_LEVEL = {
+    Public: "public",
+    Private: "private",
+    FollowersOnly: "followersOnly",
+} as const;
+
+export const SOCIAL_AUTH_PROVIDER = {
+    Google: "google",
+    Apple: "apple",
+    Facebook: "facebook",
+} as const;
+
 
 export type SocialMedia = {
     twitter?: string;
@@ -18,53 +54,93 @@ export type SessionMetadata = {
 };
 
 // --- Content ---
-export type PostStatus =
-    | "draft"
-    | "pending"
-    | "published"
-    | "scheduled"
-    | "archived"
-    | "trashed";
+export const POST_STATUS = {
+    Draft: "draft",
+    Pending: "pending",
+    Published: "published",
+    Scheduled: "scheduled",
+    Archived: "archived",
+    Trashed: "trashed",
+} as const;
 
-export type PostType = "article" | "news" | "page" | "podcast" | "video";
-
+export const POST_TYPE = {
+    Article: "article",
+    News: "news",
+    Page: "page",
+    Podcast: "podcast",
+    Video: "video",
+} as const;
 
 // --- Comments ---
-export type CommentStatus = "pending" | "approved" | "spam" | "trashed";
+export const COMMENT_STATUS = {
+    Pending: "pending",
+    Approved: "approved",
+    Spam: "spam",
+    Trashed: "trashed",
+} as const;
 
-export type CommentClass =
-    | "best"
-    | "good"
-    | "average"
-    | "hate_speech"
-    | "bullying"
-    | "vulgar"
-    | "spamming"
-    | "expedient"
-    | "peoples_choice";
 
-export type Sentiment =
-    | "positive"
-    | "negative"
-    | "neutral"
-    | "expedient"
-    | "peoples_choice";
+export const COMMENT_CLASS = {
+    Best: "best",
+    Good: "good",
+    Average: "average",
+    HateSpeech: "hate_speech",
+    Bullying: "bullying",
+    Vulgar: "vulgar",
+    Spamming: "spamming",
+    Expedient: "expedient",
+    PeoplesChoice: "peoples_choice",
+} as const;
+
+
+export const SENTIMENT = {
+    Positive: "positive",
+    Negative: "negative",
+    Neutral: "neutral",
+    Expedient: "expedient",
+    PeoplesChoice: "peoples_choice",
+} as const;
+
 
 // --- Social ---
-export type ReactionType = "like" | "dislike";
-export type EmojiSentiment = "positive" | "negative";
-export type FollowStatus = "follow" | "block";
-export type FriendRequestStatus = "pending" | "accepted" | "rejected" | "blocked";
+export const REACTION_TYPE = {
+    Like: "like",
+    Dislike: "dislike",
+} as const;
 
-// --- Chat ---
-export type ChatRoomVisibility = "public" | "private";
-export type MessageStatus = "sent" | "delivered" | "read";
+export const EMOJI_SENTIMENT = {
+    Positive: "positive",
+    Negative: "negative",
+} as const;
+
+export const FOLLOW_STATUS = {
+    Follow: "follow",
+    Block: "block",
+} as const;
+
+export const FRIEND_REQUEST_STATUS = {
+    Pending: "pending",
+    Accepted: "accepted",
+    Rejected: "rejected",
+    Blocked: "blocked",
+} as const;
+
 
 // --- Notifications ---
-export type NotificationStatus = "unread" | "read" | "dismissed";
+export const NOTIFICATION_STATUS = {
+    Unread: "unread",
+    Read: "read",
+    Dismissed: "dismissed",
+} as const;
+
 
 // --- Polls ---
-export type PollType = "single_choice" | "multiple_choice";
+export const POLL_TYPE = {
+    SingleChoice: "single_choice",
+    MultipleChoice: "multiple_choice",
+} as const;
+
+export type PollType = typeof POLL_TYPE[keyof typeof POLL_TYPE];
 
 export type PollStyles = {
     theme?: string;
@@ -73,12 +149,44 @@ export type PollStyles = {
 };
 
 // --- Taxonomy ---
-export type TaxonomyType = "category" | "tag" | "topic";
+export const TAXONOMY_TYPE = {
+    Category: "category",
+    Tag: "tag",
+    Topic: "topic",
+} as const;
+
 
 // --- Mailing ---
-export type EmailDeliveryStatus =
-    | "pending"
-    | "sent"
-    | "delivered"
-    | "bounced"
-    | "failed";
+export const EMAIL_DELIVERY_STATUS = {
+    Pending: "pending",
+    Sent: "sent",
+    Delivered: "delivered",
+    Bounced: "bounced",
+    Failed: "failed",
+} as const;
+
+
+
+export type Role = typeof ROLE[keyof typeof ROLE];
+export type Access = typeof ACCESS[keyof typeof ACCESS];
+
+export type Theme = typeof THEME[keyof typeof THEME];
+export type PrivacyLevel = typeof PRIVACY_LEVEL[keyof typeof PRIVACY_LEVEL];
+export type SocialAuthProvider = typeof SOCIAL_AUTH_PROVIDER[keyof typeof SOCIAL_AUTH_PROVIDER];
+
+
+export type PostStatus = typeof POST_STATUS[keyof typeof POST_STATUS];
+export type PostType = typeof POST_TYPE[keyof typeof POST_TYPE];
+
+export type CommentClass = typeof COMMENT_CLASS[keyof typeof COMMENT_CLASS];
+export type CommentStatus = typeof COMMENT_STATUS[keyof typeof COMMENT_STATUS];
+export type Sentiment = typeof SENTIMENT[keyof typeof SENTIMENT];
+
+export type ReactionType = typeof REACTION_TYPE[keyof typeof REACTION_TYPE];
+export type EmojiSentiment = typeof EMOJI_SENTIMENT[keyof typeof EMOJI_SENTIMENT];
+export type FollowStatus = typeof FOLLOW_STATUS[keyof typeof FOLLOW_STATUS];
+export type FriendRequestStatus = typeof FRIEND_REQUEST_STATUS[keyof typeof FRIEND_REQUEST_STATUS];
+
+export type NotificationStatus = typeof NOTIFICATION_STATUS[keyof typeof NOTIFICATION_STATUS];
+export type TaxonomyType = typeof TAXONOMY_TYPE[keyof typeof TAXONOMY_TYPE];
+export type EmailDeliveryStatus = typeof EMAIL_DELIVERY_STATUS[keyof typeof EMAIL_DELIVERY_STATUS];
