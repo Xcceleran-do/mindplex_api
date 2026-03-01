@@ -34,7 +34,6 @@ export const relations = defineRelations(schema, (r) => ({
             to: r.posts.authorId,
         }),
 
-        // 🔥 NEW M2M SYNTAX: Direct relation skipping the junction table
         coAuthoredPosts: r.many.posts({
             from: r.users.id.through(r.postAuthors.userId),
             to: r.posts.id.through(r.postAuthors.postId),
@@ -49,7 +48,7 @@ export const relations = defineRelations(schema, (r) => ({
             to: r.commentClassifications.classifiedById,
         }),
 
-        // 🔥 Explicit from/to on self-relations removes ambiguity
+
         followers: r.many.follows({
             from: r.users.id,
             to: r.follows.followingId,
