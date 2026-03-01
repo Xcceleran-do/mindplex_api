@@ -1,35 +1,14 @@
 import { Hono } from "hono";
-import { createMiddleware } from "hono/factory";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
-
-import * as schema from '$src/db/schema'
 import { registerDocs } from "$src/lib/openapi";
 import { AppContext } from "$src/types";
+
 import auth from "$src/routes/auth";
-import { env } from '$env'
 import { debugMode } from "$src/middleware/debug";
 import { wordpressProxy } from '$src/middleware/wordpressProxy';
+import post from "$src/routes/post/v1";
+import { dbMiddleware } from "$src/middleware/db";
 
 const app = new Hono<AppContext>();
-
-const ssl = env.DB_USE_SSL === 'true' ? {
-  rejectUnauthorized: false,
-} : false
-
-
-const pool = new Pool({
-  connectionString: env.DATABASE_URL,
-  ssl: ssl
-});
-
-const db = drizzle({ schema, client: pool });
-
-const dbMiddleware = createMiddleware(async (c, next) => {
-  c.set("db", db);
-  c.set("schema", schema);
-  await next();
-});
 
 app.use(dbMiddleware);
 app.use('*', debugMode);
@@ -37,6 +16,9 @@ app.use('*', debugMode);
 registerDocs(app);
 
 app.route('/auth', auth);
+app.route('/', post);
+
+
 app.get("/", (c) => {
   return c.json({
     message:
