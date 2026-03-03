@@ -16,7 +16,7 @@ app.use('*', debugMode);
 registerDocs(app);
 
 app.route('/auth', auth);
-app.route('/', post);
+app.route('/post/v1', post);
 
 
 app.get("/", (c) => {
