@@ -63,17 +63,21 @@ src/
 │       ├── index.ts       # Aggregator for all schemas
 │       └── types.ts       # Shared TypeScript literal types
 ├── lib/
-│   ├── env.ts             # Typed environment validation
 │   ├── tokens.ts          # Token generation, hashing, and verification
 │   └── openapi.ts         # Scalar UI and OpenAPI registration
 ├── middleware/
-│   └── auth.ts            # requireAuth and role-based access middleware
+│   ├── auth.ts            # requireAuth and role-based access middleware
+│   └── db.ts              # Database connection middleware
+│   └── debug.ts           # Debugging middleware
+       
+
 ├── routes/
 │   ├── api/v1/            # Modern REST controllers
 │   ├── legacy/            # Adapters for backwards compatibility with WP clients
 │   └── auth/              # Authentication routes
 ├── services/              # Drizzle query logic and business rules
 ├── types.ts               # Hono AppContext and global types
+├── env.ts                 # Typed environment validation
 └── index.ts               # Application entrypoint
 
 ```
