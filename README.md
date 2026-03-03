@@ -69,7 +69,7 @@ src/
 │   ├── auth.ts            # requireAuth and role-based access middleware
 │   └── db.ts              # Database connection middleware
 │   └── debug.ts           # Debugging middleware
-       
+
 
 ├── routes/
 │   ├── api/v1/            # Modern REST controllers
