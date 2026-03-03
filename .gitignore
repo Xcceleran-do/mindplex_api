@@ -4,3 +4,6 @@ node_modules/
 /generated/prisma
 
 .env
+
+src/scripts/wp_migration
+src/scripts/migration

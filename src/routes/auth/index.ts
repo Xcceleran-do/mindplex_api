@@ -1,12 +1,13 @@
 import { Hono } from 'hono';
 import { eq, and } from 'drizzle-orm';
-import { generateAccessToken, generateOpaqueToken, hashToken } from '$src/lib/jwt';
+import { generateAccessToken, generateOpaqueToken, hashToken, isLegacyPassword } from '$src/lib/jwt';
 import type { AppContext } from '$src/types';
 import { validator } from 'hono-openapi';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { users, userProfiles, userPreferences, userNotificationSettings, activationTokens, userSocialAuths, refreshTokens } from '$src/db/schema'
 import { Role } from '$src/db/schema';
 import { env } from '$env'
+import { verifyWordpressPassword } from '$src/lib/jwt'
 
 import {
     LoginSchema, RegisterSchema, SocialLoginSchema, RefreshTokenSchema,
@@ -37,14 +38,28 @@ auth.post('/login', loginDocs, validator('json', LoginSchema), async (c) => {
         c.get('debugData').userNotFound = true;
         return c.json({ error: 'Invalid credentials' }, 401);
     }
+    const legacy = isLegacyPassword(user.passwordHash);
 
-    const isMatch = await Bun.password.verify(password, user.passwordHash);
+    const isMatch = legacy ? await verifyWordpressPassword(password, user.passwordHash) : await Bun.password.verify(password, user.passwordHash);
+
+    if (isMatch && legacy) {
+        const modernPassword = await Bun.password.hash(password, {
+            algorithm: "argon2id",
+            memoryCost: 65536, // 64MB memory usage per hash 
+            timeCost: 2
+        })
+        await db.update(users).set({
+            passwordHash: modernPassword
+        }).where(eq(users.id, user.id));
+    }
 
     if (!isMatch) {
+        c.get('debugData').invalidPassword = true;
         return c.json({ error: 'Invalid credentials' }, 401);
     }
 
     if (!user.isActivated) {
+        c.get('debugData').accountNotActivated = true;
         return c.json({ error: 'Account not activated' }, 403);
     }
 
@@ -91,6 +106,7 @@ auth.post('/register', registerDocs, validator('json', RegisterSchema), async (c
         memoryCost: 65536, // 64MB memory usage per hash 
         timeCost: 2
     });
+
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 

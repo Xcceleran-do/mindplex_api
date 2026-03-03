@@ -17,7 +17,6 @@ export const POST_INCLUDES: Record<string, IncludeConfig<"posts">> = {
             }
         }
     },
-
     categories: {
         requiredRole: ACCESS.User,
         drizzleWith: {
