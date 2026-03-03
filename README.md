@@ -223,8 +223,17 @@ By default, mutations return the updated state of the resource (or a `201 Create
 
 ### Backend Implementation Guide (For Maintainers)
 
-> [!NOTE]
-> Will be updated soon.
+Before writing any new route, service, or controller, read the documentation in the `/docs` folder:
+
+| Document | What It Covers |
+|---|---|
+| [`docs/API_SPEC.md`](./docs/API_SPEC.md) | Every endpoint in the API mapped to its schema table. Use this as the reference for URL patterns, HTTP methods, auth requirements, and request/response shapes. If you are adding a new endpoint, follow the conventions established here. |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | The data fetching philosophy (`fields`, `include`, Opinionated Packets), sub-resource patterns, mutation conventions, routing structure, and the Controller → Service → Schema separation. |
+
+**The short version:**
+
+1. Check `API_SPEC.md` to see if the endpoint already exists or where it should live.
+2. Follow the sub-resource and naming patterns in `ARCHITECTURE.md`.
 
 ## API Documentation
 
