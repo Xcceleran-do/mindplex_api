@@ -50,7 +50,7 @@ When a schema has a unique constraint on `(userId, resourceId)` — such as reac
 
 ### Authentication
 
-Endpoints that require auth are marked with required. Endpoints that behave differently for authenticated vs. anonymous users are marked with 🔓. Public endpoints have no marker.
+Endpoints that require auth are marked with required. Endpoints that behave differently for authenticated vs. anonymous users are marked with open. Public endpoints have no marker.
 
 ---
 
