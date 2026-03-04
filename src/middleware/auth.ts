@@ -1,23 +1,73 @@
 import { createMiddleware } from 'hono/factory';
-import { verifyToken } from '$src/lib/jwt';
+import { verifyToken, type UserJwtPayload } from '$src/lib/jwt';
 import type { AppContext } from '$src/types';
+import { hasRole } from '$src/utils';
+import type { Access, Role } from '$src/db/schema/types';
+import { ACCESS } from '$src/db/schema/types';
+import type { Context } from 'hono';
 
-export const requireAuth = createMiddleware<AppContext>(async (c, next) => {
-    const authHeader = c.req.header('Authorization');
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return c.json({ error: 'Missing or invalid Authorization header' }, 401);
-    }
+/**
+ * Single auth middleware for every route in the API.
+ *
+ * ```ts
+ * guard()              // any logged-in user
+ * guard("optional")    // parse token if present, don't fail if missing
+ * guard("editor")      // logged-in + minimum Editor role
+ * guard("admin")       // logged-in + minimum Admin role
+ * guard("collaborator") // logged-in + minimum collaborator
+ * ```
+ *
+ * After `guard()` or `guard(role)`, `c.get('user')` is guaranteed non-null.
+ * After `guard("optional")`, `c.get('user')` may be null.
+ */
+export function guard(mode?: "optional" | Access) {
+    return createMiddleware<AppContext>(async (c, next) => {
+        const authHeader = c.req.header('Authorization');
+        const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
 
-    const token = authHeader.split(' ')[1];
+        let user: UserJwtPayload | null = null;
+        if (token) {
+            try {
+                user = await verifyToken(token);
+            } catch {
+                // Token present but invalid
+                if (mode !== "optional") {
+                    return c.json({ error: 'Unauthorized: Invalid or expired token' }, 401);
+                }
+            }
+        }
 
-    try {
-        const decodedPayload = await verifyToken(token);
+        if (!user && mode !== "optional") {
+            return c.json({ error: 'Unauthorized' }, 401);
+        }
 
-        c.set('user', decodedPayload);
 
-        await next();
-    } catch (error) {
-        return c.json({ error: 'Unauthorized: Invalid or expired token' }, 401);
-    }
-});
+        if (user && mode && mode !== "optional") {
+            if (!hasRole(user.role as Access, mode as Access)) {
+                return c.json({ error: 'Forbidden: Insufficient permissions' }, 403);
+            }
+        }
+
+        c.set('user', user);
+        c.set('userId', user ? Number(user.sub) : null);
+        c.set('role', user ? (user.role as Access) : ACCESS.Public);
+
+        return next();
+    });
+}
+
+/**
+ * Is the current user the resource owner, or do they have `minRole`?
+ *
+ * ```ts
+ * if (!isOwnerOrRole(c, post.authorId)) return c.json({ error: 'Forbidden' }, 403);
+ * if (!isOwnerOrRole(c, comment.authorId, "moderator")) ...
+ * ```
+ */
+export function isOwnerOrRole(c: Context<AppContext>, ownerId: number, minRole: Access = ACCESS.Admin): boolean {
+    const user = c.get('user')
+    if (!user) return false;
+    if (Number(user.sub) === ownerId) return true;
+    return hasRole(user.role as Access, minRole);
+}
