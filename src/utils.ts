@@ -1,4 +1,4 @@
-import { getColumns } from "drizzle-orm";
+import { eq, getColumns } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
 import * as v from 'valibot';
 import { ACCESS, Access, ROLE_HIERARCHY } from "$src/db/schema/types";
@@ -349,4 +349,43 @@ export function buildRelationalWith<TableName extends keyof DbClient['query']>(
     }
 
     return relationalWith as TableWithConfig<TableName>;
+}
+
+/**
+ * Generates a URL-friendly slug from a title string.
+ *
+ * It converts the title to lowercase, removes special characters, replaces spaces with hyphens,
+ * and appends a random suffix to ensure uniqueness.
+ *
+ * @param title - The title string to convert
+ * @returns A unique, URL-safe slug
+ *
+ * @example
+ * ```typescript
+ * generateSlug('My Awesome Post!') // "my-awesome-post-a1b2c3"
+ * generateSlug('  Leading & Trailing Spaces  ') // "leading-trailing-spaces-d4e5f6"
+ * ```
+ */
+
+export function generateSlug(title: string): string {
+    const base = title
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+
+    const suffix = Math.random().toString(36).substring(2, 8);
+    return `${base}-${suffix}`;
+}
+
+
+export function getByIdOrSlug<T extends PgTable>(table: T, identifier: string) {
+    const cols = getColumns(table);
+    if (/^\d+$/.test(identifier)) {
+        const id = Number(identifier);
+        return { query: { id }, filter: eq(cols.id, id) };
+    }
+    return { query: { slug: identifier }, filter: eq(cols.slug, identifier) };
 }

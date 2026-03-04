@@ -7,7 +7,9 @@ export type AppContext = {
     Variables: {
         db: DbClient
         schema: typeof schema
-        user: UserJwtPayload;
+        user: UserJwtPayload | null;
+        userId: number | null;
+        role: Access;
         debugData: Record<string, any>;
     };
 };

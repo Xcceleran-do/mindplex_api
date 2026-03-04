@@ -2,12 +2,11 @@ import { Hono } from "hono";
 import { registerDocs } from "$src/lib/openapi";
 import { AppContext } from "$src/types";
 
-import auth from "$src/routes/auth";
 import { debugMode } from "$src/middleware/debug";
 import { wordpressProxy } from '$src/middleware/wordpressProxy';
-import post from "$src/routes/post/v1";
-import { dbMiddleware } from "$src/middleware/db";
 
+import { dbMiddleware } from "$src/middleware/db";
+import v1Router from "$src/routes/v1";
 const app = new Hono<AppContext>();
 
 app.use(dbMiddleware);
@@ -15,9 +14,7 @@ app.use('*', debugMode);
 
 registerDocs(app);
 
-app.route('/auth', auth);
-app.route('/post/v1', post);
-
+app.route('/v1', v1Router);
 
 app.get("/", (c) => {
   return c.json({
@@ -44,6 +41,6 @@ app.get("/health", async (c) => {
   }
 });
 
-
 app.use('/wp/*', wordpressProxy);
+
 export default app;
