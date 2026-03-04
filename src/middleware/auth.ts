@@ -11,7 +11,7 @@ import type { Context } from 'hono';
  * Single auth middleware for every route in the API.
  *
  * ```ts
- * guard()              // any logged-in user
+ * guard()              // admin only (secure default)
  * guard("optional")    // parse token if present, don't fail if missing
  * guard("editor")      // logged-in + minimum Editor role
  * guard("admin")       // logged-in + minimum Admin role
@@ -21,7 +21,7 @@ import type { Context } from 'hono';
  * After `guard()` or `guard(role)`, `c.get('user')` is guaranteed non-null.
  * After `guard("optional")`, `c.get('user')` may be null.
  */
-export function guard(mode?: "optional" | Access) {
+export function guard(mode: "optional" | Access = ACCESS.Admin) {
     return createMiddleware<AppContext>(async (c, next) => {
         const authHeader = c.req.header('Authorization');
         const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
@@ -31,7 +31,6 @@ export function guard(mode?: "optional" | Access) {
             try {
                 user = await verifyToken(token);
             } catch {
-                // Token present but invalid
                 if (mode !== "optional") {
                     return c.json({ error: 'Unauthorized: Invalid or expired token' }, 401);
                 }
