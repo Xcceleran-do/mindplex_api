@@ -143,7 +143,7 @@ app.patch("/:identifier", guard('editor'), updatePostDocs, validator("param", Po
 });
 
 
-app.delete("/:identifier", guard(), deletePostDocs, validator("param", PostIdentifierParamSchema), async (c) => {
+app.delete("/:identifier", guard('admin'), deletePostDocs, validator("param", PostIdentifierParamSchema), async (c) => {
     const db = c.get("db");
     const { identifier } = c.req.valid("param");
 
