@@ -3,23 +3,22 @@ import { registerDocs } from "$src/lib/openapi";
 import { AppContext } from "$src/types";
 
 import { debugMode } from "$src/middleware/debug";
-import { wordpressProxy } from '$src/middleware/wordpressProxy';
+import { wordpressProxy } from "$src/middleware/wordpressProxy";
 
 import { dbMiddleware } from "$src/middleware/db";
 import v1Router from "$src/routes/v1";
 const app = new Hono<AppContext>();
 
 app.use(dbMiddleware);
-app.use('*', debugMode);
+app.use("*", debugMode);
 
 registerDocs(app);
 
-app.route('/v1', v1Router);
+app.route("/v1", v1Router);
 
 app.get("/", (c) => {
   return c.json({
-    message:
-      "This service is not meant to be accessed directly. Use the API endpoints instead.",
+    message: "This service is not meant to be accessed directly. Use the API endpoints instead.",
   });
 });
 
@@ -41,6 +40,6 @@ app.get("/health", async (c) => {
   }
 });
 
-app.use('/wp/*', wordpressProxy);
+app.use("/wp/*", wordpressProxy);
 
 export default app;

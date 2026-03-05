@@ -1,11 +1,10 @@
-import { createMiddleware } from 'hono/factory';
-import { verifyToken, type UserJwtPayload } from '$src/lib/jwt';
-import type { AppContext } from '$src/types';
-import { hasRole } from '$src/utils';
-import type { Access } from '$src/db/schema/types';
-import { ACCESS } from '$src/db/schema/types';
-import type { Context } from 'hono';
-
+import { createMiddleware } from "hono/factory";
+import { verifyToken, type UserJwtPayload } from "$src/lib/jwt";
+import type { AppContext } from "$src/types";
+import { hasRole } from "$src/utils";
+import type { Access } from "$src/db/schema/types";
+import { ACCESS } from "$src/db/schema/types";
+import type { Context } from "hono";
 
 /**
  * Single auth middleware for every route in the API.
@@ -22,38 +21,37 @@ import type { Context } from 'hono';
  * After `guard("optional")`, `c.get('user')` may be null.
  */
 export function guard(mode: "optional" | Access = ACCESS.Admin) {
-    return createMiddleware<AppContext>(async (c, next) => {
-        const authHeader = c.req.header('Authorization');
-        const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+  return createMiddleware<AppContext>(async (c, next) => {
+    const authHeader = c.req.header("Authorization");
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
 
-        let user: UserJwtPayload | null = null;
-        if (token) {
-            try {
-                user = await verifyToken(token);
-            } catch {
-                if (mode !== "optional") {
-                    return c.json({ error: 'Unauthorized: Invalid or expired token' }, 401);
-                }
-            }
+    let user: UserJwtPayload | null = null;
+    if (token) {
+      try {
+        user = await verifyToken(token);
+      } catch {
+        if (mode !== "optional") {
+          return c.json({ error: "Unauthorized: Invalid or expired token" }, 401);
         }
+      }
+    }
 
-        if (!user && mode !== "optional") {
-            return c.json({ error: 'Unauthorized' }, 401);
-        }
+    if (!user && mode !== "optional") {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
 
+    if (user && mode && mode !== "optional") {
+      if (!hasRole(user.role as Access, mode as Access)) {
+        return c.json({ error: "Forbidden: Insufficient permissions" }, 403);
+      }
+    }
 
-        if (user && mode && mode !== "optional") {
-            if (!hasRole(user.role as Access, mode as Access)) {
-                return c.json({ error: 'Forbidden: Insufficient permissions' }, 403);
-            }
-        }
+    c.set("user", user);
+    c.set("userId", user ? Number(user.sub) : null);
+    c.set("role", user ? (user.role as Access) : ACCESS.Public);
 
-        c.set('user', user);
-        c.set('userId', user ? Number(user.sub) : null);
-        c.set('role', user ? (user.role as Access) : ACCESS.Public);
-
-        return next();
-    });
+    return next();
+  });
 }
 
 /**
@@ -65,8 +63,8 @@ export function guard(mode: "optional" | Access = ACCESS.Admin) {
  * ```
  */
 export function isOwnerOrRole(c: Context<AppContext>, ownerId: number, minRole: Access = ACCESS.Admin): boolean {
-    const user = c.get('user')
-    if (!user) return false;
-    if (Number(user.sub) === ownerId) return true;
-    return hasRole(user.role as Access, minRole);
+  const user = c.get("user");
+  if (!user) return false;
+  if (Number(user.sub) === ownerId) return true;
+  return hasRole(user.role as Access, minRole);
 }

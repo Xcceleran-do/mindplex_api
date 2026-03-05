@@ -49,13 +49,13 @@ When the frontend passes an `include` flag, the backend guarantees a specific, i
 
 ### Post Includes
 
-| Include Flag | What It Does | Resulting Shape |
-|---|---|---|
-| `author` | Joins `users` + `userProfiles`. Calculates `isFollowing` if viewer is authenticated. | `{ id, username, displayName, avatarUrl, isFollowing }` |
-| `categories` | Joins through `postTaxonomies` where `type = 'category'` | `[{ id, name, slug }]` |
-| `tags` | Joins through `postTaxonomies` where `type = 'tag'` | `[{ id, name, slug }]` |
-| `reputation` | Joins reputation data for the author. Requires `author` to also be included. | `{ mpxr: number, level: number }` |
-| `viewerContext` | Evaluates SQL `EXISTS` against `postReactions`, `bookmarks`, etc. for the authenticated user. | `{ isLiked: boolean, isBookmarked: boolean }` |
+| Include Flag    | What It Does                                                                                  | Resulting Shape                                         |
+| --------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `author`        | Joins `users` + `userProfiles`. Calculates `isFollowing` if viewer is authenticated.          | `{ id, username, displayName, avatarUrl, isFollowing }` |
+| `categories`    | Joins through `postTaxonomies` where `type = 'category'`                                      | `[{ id, name, slug }]`                                  |
+| `tags`          | Joins through `postTaxonomies` where `type = 'tag'`                                           | `[{ id, name, slug }]`                                  |
+| `reputation`    | Joins reputation data for the author. Requires `author` to also be included.                  | `{ mpxr: number, level: number }`                       |
+| `viewerContext` | Evaluates SQL `EXISTS` against `postReactions`, `bookmarks`, etc. for the authenticated user. | `{ isLiked: boolean, isBookmarked: boolean }`           |
 
 ### How to Add a New Opinionated Packet
 
@@ -92,12 +92,12 @@ All request bodies must be `application/json`. No form-data unless handling expl
 
 ### Response Conventions
 
-| Action | Response |
-|---|---|
-| Create | `201 Created` with the created resource |
-| Update | `200 OK` with the updated resource |
-| Delete | `204 No Content` |
-| Fire-and-forget (views) | `202 Accepted` |
+| Action                  | Response                                |
+| ----------------------- | --------------------------------------- |
+| Create                  | `201 Created` with the created resource |
+| Update                  | `200 OK` with the updated resource      |
+| Delete                  | `204 No Content`                        |
+| Fire-and-forget (views) | `202 Accepted`                          |
 
 Mutations can optionally accept `?include=` query parameters if the frontend needs the fully hydrated object back immediately after updating.
 
@@ -160,8 +160,8 @@ Each role inherits all permissions from lower roles. The hierarchy is defined in
 
 In the [API_SPEC.md](./API_SPEC.md):
 
-| Marker | Meaning |
-|---|---|
-| required | Requires authentication |
+| Marker   | Meaning                                    |
+| -------- | ------------------------------------------ |
+| required | Requires authentication                    |
 | optional | Behaves differently for auth vs. anonymous |
-| (none) | Fully public |
+| (none)   | Fully public                               |
