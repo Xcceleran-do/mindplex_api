@@ -1,19 +1,11 @@
 /**
  * Test setup and helpers.
- *
- * Provides:
- *   - Token generation for any role
- *   - Test data seeding / cleanup
- *   - A thin `api()` wrapper around app.fetch()
- *
- * Usage:
- *   import { api, seed, cleanup, tokens } from './setup';
  */
 
 import { generateAccessToken } from '$src/lib/jwt';
 import { db } from '$src/db/client';
 import * as schema from '$src/db/schema';
-import { eq, like } from 'drizzle-orm';
+import { eq, inArray, like } from 'drizzle-orm';
 import type { Role } from '$src/db/schema/types';
 import app from '$src/index';
 
@@ -29,17 +21,15 @@ type TestUser = {
     role: Role;
 };
 
+type TestComment = {
+    id: number;
+    postId: number;
+    authorId: number;
+    parentId?: number;
+};
+
 const tokenCache = new Map<string, TestUser>();
 
-/**
- * Returns a test user with a valid JWT for the given role.
- * Creates the user in the DB on first call, caches for subsequent calls.
- *
- * ```ts
- * const admin = await asRole('admin');
- * const res = await api.post('/api/v1/posts', { body, token: admin.token });
- * ```
- */
 export async function asRole(role: Role): Promise<TestUser> {
     if (tokenCache.has(role)) return tokenCache.get(role)!;
 
@@ -77,22 +67,26 @@ export async function asRole(role: Role): Promise<TestUser> {
 }
 
 export type SeededData = {
-    users: { admin: TestUser; editor: TestUser; user: TestUser };
+    users: { admin: TestUser; editor: TestUser; moderator: TestUser; user: TestUser };
     posts: { id: number; slug: string; authorId: number }[];
+    comments: {
+        byUser: TestComment;
+        byEditor: TestComment;
+        pending: TestComment;
+        replies: TestComment[];
+    };
 };
 
-/**
- * Seeds the minimum data needed for post tests.
- * Call in `beforeAll`.
- */
 export async function seed(): Promise<SeededData> {
     const admin = await asRole('admin');
     const editor = await asRole('editor');
+    const moderator = await asRole('moderator');
     const user = await asRole('user');
 
+    // Seed posts
     const postData = [
-        { authorId: user.id, title: 'Test User Post', slug: `${TEST_PREFIX}user-post`, status: 'published' as const, type: 'article' as const, content: 'User content' },
-        { authorId: editor.id, title: 'Test Editor Post', slug: `${TEST_PREFIX}editor-post`, status: 'published' as const, type: 'news' as const, content: 'Editor content' },
+        { authorId: editor.id, title: 'Test Commentable Post', slug: `${TEST_PREFIX}comment-post`, status: 'published' as const, type: 'article' as const, content: 'Post with comments', commentEnabled: true },
+        { authorId: editor.id, title: 'Test Comments Disabled', slug: `${TEST_PREFIX}no-comments-post`, status: 'published' as const, type: 'article' as const, content: 'Comments disabled', commentEnabled: false },
         { authorId: admin.id, title: 'Test Draft Post', slug: `${TEST_PREFIX}draft-post`, status: 'draft' as const, type: 'article' as const, content: 'Draft content' },
     ];
 
@@ -102,16 +96,72 @@ export async function seed(): Promise<SeededData> {
         authorId: schema.posts.authorId,
     });
 
+    const commentablePostId = posts[0].id;
+
+    // Root comment by user (approved)
+    const [byUser] = await db.insert(schema.comments).values({
+        postId: commentablePostId,
+        authorId: user.id,
+        content: 'Approved comment by user',
+        status: 'approved',
+    }).returning({ id: schema.comments.id, postId: schema.comments.postId, authorId: schema.comments.authorId });
+
+    // Root comment by editor (approved)
+    const [byEditor] = await db.insert(schema.comments).values({
+        postId: commentablePostId,
+        authorId: editor.id,
+        content: 'Approved comment by editor',
+        status: 'approved',
+    }).returning({ id: schema.comments.id, postId: schema.comments.postId, authorId: schema.comments.authorId });
+
+    // Root comment (pending — awaiting moderation)
+    const [pending] = await db.insert(schema.comments).values({
+        postId: commentablePostId,
+        authorId: user.id,
+        content: 'Pending comment awaiting moderation',
+        status: 'pending',
+    }).returning({ id: schema.comments.id, postId: schema.comments.postId, authorId: schema.comments.authorId });
+
+    // Multiple replies to the editor's comment (for pagination testing)
+    const replyValues = Array.from({ length: 5 }, (_, i) => ({
+        postId: commentablePostId,
+        authorId: user.id,
+        parentId: byEditor.id,
+        content: `Reply ${i + 1} to editor`,
+        status: 'approved' as const,
+    }));
+
+    const replies = await db.insert(schema.comments).values(replyValues).returning({
+        id: schema.comments.id,
+        postId: schema.comments.postId,
+        authorId: schema.comments.authorId,
+        parentId: schema.comments.parentId,
+    });
+
     return {
-        users: { admin, editor, user },
+        users: { admin, editor, moderator, user },
         posts,
+        comments: {
+            byUser: byUser as TestComment,
+            byEditor: byEditor as TestComment,
+            pending: pending as TestComment,
+            replies: replies.map(r => ({ ...r, parentId: r.parentId! })) as TestComment[],
+        },
     };
 }
 
-/**
- * Removes all test data. Call in `afterAll`.
- */
 export async function cleanup() {
+    const testPostIds = await db
+        .select({ id: schema.posts.id })
+        .from(schema.posts)
+        .where(like(schema.posts.slug, `${TEST_PREFIX}%`));
+
+    if (testPostIds.length > 0) {
+        await db.delete(schema.comments).where(
+            inArray(schema.comments.postId, testPostIds.map(p => p.id))
+        );
+    }
+
     await db.delete(schema.posts).where(like(schema.posts.slug, `${TEST_PREFIX}%`));
     await db.delete(schema.users).where(like(schema.users.username, `${TEST_PREFIX}%`));
     tokenCache.clear();
@@ -123,16 +173,6 @@ type RequestOptions = {
     query?: Record<string, string>;
 };
 
-/**
- * Thin wrapper around app.fetch(). Returns the Response directly.
- *
- * ```ts
- * const res = await api.get('/api/v1/posts?limit=5');
- * const res = await api.post('/api/v1/posts', { body: { title: 'Hi' }, token });
- * const res = await api.patch('/api/v1/posts/my-slug', { body: { title: 'New' }, token });
- * const res = await api.delete('/api/v1/posts/my-slug', { token });
- * ```
- */
 export const api = {
     get: (path: string, opts?: RequestOptions) => send('GET', path, opts),
     post: (path: string, opts?: RequestOptions) => send('POST', path, opts),
@@ -158,4 +198,3 @@ async function send(method: string, path: string, opts?: RequestOptions): Promis
         body: opts?.body ? JSON.stringify(opts.body) : undefined,
     }));
 }
-
