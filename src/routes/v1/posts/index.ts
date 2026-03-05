@@ -6,6 +6,7 @@ import { buildFieldSelection, buildRelationalWith, generateSlug, sanitizeUpdates
 import { FORBIDDEN_COLUMNS, postListDocs, postDetailsDocs, deletePostDocs, PostIdentifierParamSchema, UPDATABLE_FIELDS, updatePostDocs, UpdatePostSchema, PostDetailsQuerySchema, PostListQuerySchema, createPostDocs, CreatePostSchema } from "./schema";
 import { ACCESS } from "$src/db/schema";
 import { guard, isOwnerOrRole } from "$src/middleware/auth";
+import postComments from "./comments";
 
 const app = new Hono<AppContext>();
 
@@ -29,7 +30,7 @@ export const POST_INCLUDES: Record<string, IncludeConfig<"posts">> = {
 
 } as const;
 
-
+// GET /post
 app.get("/", guard("optional"), postListDocs, validator("query", PostListQuerySchema), async (c) => {
     const db = c.get("db");
     const { fields, limit, page, include = [] } = c.req.valid("query");
@@ -48,8 +49,7 @@ app.get("/", guard("optional"), postListDocs, validator("query", PostListQuerySc
     return c.json({ data });
 });
 
-
-// GET /:identifier — Single post (optional auth for viewerContext)
+// GET /post/:identifier 
 app.get("/:identifier", guard("optional"), postDetailsDocs, validator("param", PostIdentifierParamSchema), validator("query", PostDetailsQuerySchema), async (c) => {
     const db = c.get("db");
     const { identifier } = c.req.valid("param");
@@ -70,8 +70,7 @@ app.get("/:identifier", guard("optional"), postDetailsDocs, validator("param", P
     return c.json({ data });
 });
 
-
-// POST / — Create post (auth required)
+// POST /post
 app.post("/", guard('editor'), createPostDocs, validator("json", CreatePostSchema), async (c) => {
     const db = c.get("db");
     const userId = c.get("userId")!;
@@ -110,14 +109,15 @@ app.post("/", guard('editor'), createPostDocs, validator("json", CreatePostSchem
 });
 
 
-// PATCH /:identifier — Update post (auth + ownership)
+// PATCH /post/:identifier — Update post (auth + ownership)
 app.patch("/:identifier", guard('editor'), updatePostDocs, validator("param", PostIdentifierParamSchema), validator("json", UpdatePostSchema), async (c) => {
     const db = c.get("db");
     const { identifier } = c.req.valid("param");
     const body = c.req.valid("json");
 
+    const filter = getByIdOrSlug(posts, identifier).query
     const post = await db.query.posts.findFirst({
-        where: getByIdOrSlug(posts, identifier).query,
+        where: filter,
         columns: { id: true, authorId: true, publishedAt: true },
     });
 
@@ -142,7 +142,7 @@ app.patch("/:identifier", guard('editor'), updatePostDocs, validator("param", Po
     return c.json({ data: updated });
 });
 
-
+// DELETE /post/:identifier
 app.delete("/:identifier", guard('admin'), deletePostDocs, validator("param", PostIdentifierParamSchema), async (c) => {
     const db = c.get("db");
     const { identifier } = c.req.valid("param");
@@ -161,5 +161,7 @@ app.delete("/:identifier", guard('admin'), deletePostDocs, validator("param", Po
     return c.body(null, 204);
 });
 
-export default app;
+// /post/:identifier/comments
+app.route("/:identifier/comments", postComments);
 
+export default app;
