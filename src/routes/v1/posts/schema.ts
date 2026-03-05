@@ -16,7 +16,6 @@ export const UPDATABLE_FIELDS = new Set([
     'status', 'type', 'estimatedReadingMinutes', 'publishedAt',
 ]);
 
-
 export const PostIdentifierParamSchema = v.object({
     identifier: v.pipe(v.string(), v.minLength(1), v.maxLength(255)),
 });

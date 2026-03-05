@@ -2,7 +2,7 @@ import { createMiddleware } from 'hono/factory';
 import { verifyToken, type UserJwtPayload } from '$src/lib/jwt';
 import type { AppContext } from '$src/types';
 import { hasRole } from '$src/utils';
-import type { Access, Role } from '$src/db/schema/types';
+import type { Access } from '$src/db/schema/types';
 import { ACCESS } from '$src/db/schema/types';
 import type { Context } from 'hono';
 

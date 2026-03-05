@@ -38,7 +38,6 @@ export const posts = pgTable("posts", {
     estimatedReadingMinutes: integer("estimated_reading_minutes"),
     viewCount: integer("view_count").default(0).notNull(),
 
-
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
         .defaultNow()
