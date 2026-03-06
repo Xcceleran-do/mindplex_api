@@ -120,6 +120,6 @@ app.delete("/:id", guard("user"), deleteCommentDocs, validator("param", CommentI
   return c.body(null, 204);
 });
 
-app.route("/:id/interactions", commentInteractionRoutes);
+app.route("/:id/reactions", commentInteractionRoutes);
 
 export default app;
