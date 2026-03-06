@@ -4,9 +4,9 @@
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx",
     "paths": {
-        "$src/*": ["./src/*"],
-        "$env":["./src/env.ts"],
-        "$db":["./src/db/*"]
-    },
+      "$src/*": ["./src/*"],
+      "$env": ["./src/env.ts"],
+      "$db": ["./src/db/*"]
+    }
   }
 }

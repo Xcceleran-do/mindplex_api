@@ -1,4 +1,3 @@
-
 # Mindplex Core API
 
 Mindplex Core API is the backend service powering the Mindplex platform. It is a high-performance REST API built with Hono on Bun, utilizing PostgreSQL, Redis, and Drizzle ORM.
@@ -46,13 +45,13 @@ make dev
 
 All environment variables are validated at startup using Valibot. Missing or invalid values will prevent the application from starting.
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `NODE_ENV` | No | `development` |
-| `PORT` | No | Server port (default: 3000) |
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `JWT_SECRET` | Yes | Minimum 32 characters for signing access tokens |
-| `GOOGLE_CLIENT_ID` | Yes | Google OAuth client ID |
+| Variable           | Required | Description                                     |
+| ------------------ | -------- | ----------------------------------------------- |
+| `NODE_ENV`         | No       | `development`                                   |
+| `PORT`             | No       | Server port (default: 3000)                     |
+| `DATABASE_URL`     | Yes      | PostgreSQL connection string                    |
+| `JWT_SECRET`       | Yes      | Minimum 32 characters for signing access tokens |
+| `GOOGLE_CLIENT_ID` | Yes      | Google OAuth client ID                          |
 
 ## Project Structure
 
@@ -103,32 +102,32 @@ Every standard `GET` endpoint accepts the following query parameters:
 
 Reduces the base resource to only the specified columns. If omitted, returns all standard columns.
 
-* **Format:** Comma-separated strings.
-* **Example:** `GET /api/v1/posts?fields=id,title,slug,featuredImageUrl`
+- **Format:** Comma-separated strings.
+- **Example:** `GET /api/v1/posts?fields=id,title,slug,featuredImageUrl`
 
 #### 2. `?include=` (The Expander)
 
 Attaches relational data ("Opinionated Packets") to the base resource.
 
-* **Format:** Comma-separated strings. Validated against a strict allowlist.
-* **Example:** `GET /api/v1/posts?include=author,categories,tags`
+- **Format:** Comma-separated strings. Validated against a strict allowlist.
+- **Example:** `GET /api/v1/posts?include=author,categories,tags`
 
 #### 3. Filters & Pagination
 
 Standard REST filtering.
 
-* **Example:** `GET /api/v1/posts?type=news&limit=10&offset=0`
+- **Example:** `GET /api/v1/posts?type=news&limit=10&offset=0`
 
 ### Opinionated Packets (What the Frontend Gets)
 
 When the frontend passes an `include` flag, the backend guarantees a specific, immutable data shape.
 
-| Include Flag | Database Action | Resulting JSON Shape |
-| --- | --- | --- |
-| `author` | Joins `users`. Calculates `isFollowing`. | `{ id, username, displayName, avatarUrl, isFollowing }` |
-| `categories` | Joins `post_categories` & `categories`. | `[{ id, name, slug }]` |
-| `reputation` | Joins `user_reputation` (Requires `author`). | `{ mpxr: number, level: number }` |
-| `viewerContext` | Evaluates SQL `EXISTS` on `reactions`. | `{ isLiked: boolean, isBookmarked: boolean }` |
+| Include Flag    | Database Action                              | Resulting JSON Shape                                    |
+| --------------- | -------------------------------------------- | ------------------------------------------------------- |
+| `author`        | Joins `users`. Calculates `isFollowing`.     | `{ id, username, displayName, avatarUrl, isFollowing }` |
+| `categories`    | Joins `post_categories` & `categories`.      | `[{ id, name, slug }]`                                  |
+| `reputation`    | Joins `user_reputation` (Requires `author`). | `{ mpxr: number, level: number }`                       |
+| `viewerContext` | Evaluates SQL `EXISTS` on `reactions`.       | `{ isLiked: boolean, isBookmarked: boolean }`           |
 
 ### Frontend Examples in Action
 
@@ -136,8 +135,8 @@ When the frontend passes an `include` flag, the backend guarantees a specific, i
 
 The UI only needs a thumbnail, title, and the author's basic info.
 
-* **Request:** `GET /api/v1/posts?type=news&limit=10&fields=id,title,slug,featuredImageUrl&include=author`
-* **Response:**
+- **Request:** `GET /api/v1/posts?type=news&limit=10&fields=id,title,slug,featuredImageUrl&include=author`
+- **Response:**
 
 ```json
 {
@@ -148,23 +147,22 @@ The UI only needs a thumbnail, title, and the author's basic info.
       "slug": "agi-is-approaching",
       "featuredImageUrl": "[https://s3.amazonaws.com/](https://s3.amazonaws.com/)...",
       "author": {
-         "id": 5,
-         "username": "lewis",
-         "displayName": "Ben Goertzel",
-         "avatarUrl": "https://..."
+        "id": 5,
+        "username": "lewis",
+        "displayName": "Ben Goertzel",
+        "avatarUrl": "https://..."
       }
     }
   ]
 }
-
 ```
 
 #### Scenario B: The Full Article Reader
 
 The UI needs the massive HTML body, tags, and whether the logged-in user has already liked the post.
 
-* **Request:** `GET /api/v1/posts/agi-is-approaching?include=author,reputation,categories,tags,viewerContext`
-* **Response:**
+- **Request:** `GET /api/v1/posts/agi-is-approaching?include=author,reputation,categories,tags,viewerContext`
+- **Response:**
 
 ```json
 {
@@ -172,54 +170,50 @@ The UI needs the massive HTML body, tags, and whether the logged-in user has alr
     "id": 101,
     "title": "AGI is Approaching",
     "content": "<p>Full HTML payload here...</p>",
-    "author": { 
-        "username": "lewis", 
-        "reputation": { "mpxr": 8500 } 
+    "author": {
+      "username": "lewis",
+      "reputation": { "mpxr": 8500 }
     },
-    "categories": [ { "id": 2, "name": "AI", "slug": "ai" } ],
-    "tags": [ { "id": 9, "name": "Singularity", "slug": "singularity" } ],
+    "categories": [{ "id": 2, "name": "AI", "slug": "ai" }],
+    "tags": [{ "id": 9, "name": "Singularity", "slug": "singularity" }],
     "viewerContext": {
-       "isLiked": true,
-       "isBookmarked": false
+      "isLiked": true,
+      "isBookmarked": false
     }
   }
 }
-
 ```
-
 
 ### Mutations (POST, PATCH, PUT, DELETE)
 
 While `GET` requests utilize dynamic fieldsets and includes, state-changing operations (mutations) adhere strictly to standard REST conventions and explicit Valibot schemas.
 
 #### 1. JSON Payloads & Strict Validation
+
 All request bodies must be `application/json`. We do not accept form-data unless handling explicit file uploads (e.g., avatar changes). Every payload is validated against a Valibot schema before reaching the controller.
 
-* **Example (Update Profile):** `PATCH /api/v1/users/me`
+- **Example (Update Profile):** `PATCH /api/v1/users/me`
 
   ```json
   {
     "firstName": "John",
     "theme": "dark"
   }
-
   ```
 
 #### 2. Sub-Resource Routing for Interactions
 
 We avoid RPC-style action endpoints (e.g., legacy `/wp/v2/like_dislike/post/:slug`). Instead, interactions are treated as sub-resources of the parent entity.
 
-* **Example (Like a Post):** `POST /api/v1/posts/:slug/reactions`
+- **Example (Like a Post):** `POST /api/v1/posts/:slug/reactions`
 
   ```json
   {
     "reaction": "like"
   }
-
   ```
 
-
-* **Example (Bookmark a Post):** `POST /api/v1/posts/:slug/bookmarks`
+- **Example (Bookmark a Post):** `POST /api/v1/posts/:slug/bookmarks`
 
 #### 3. Mutation Responses
 
@@ -229,10 +223,10 @@ By default, mutations return the updated state of the resource (or a `201 Create
 
 Before writing any new route, service, or controller, read the documentation in the `/docs` folder:
 
-| Document | What It Covers |
-|---|---|
-| [`docs/API_SPEC.md`](./docs/API_SPEC.md) | Every endpoint in the API mapped to its schema table. Use this as the reference for URL patterns, HTTP methods, auth requirements, and request/response shapes. If you are adding a new endpoint, follow the conventions established here. |
-| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | The data fetching philosophy (`fields`, `include`, Opinionated Packets), sub-resource patterns, mutation conventions, routing structure, and the Controller → Service → Schema separation. |
+| Document                                         | What It Covers                                                                                                                                                                                                                             |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`docs/API_SPEC.md`](./docs/API_SPEC.md)         | Every endpoint in the API mapped to its schema table. Use this as the reference for URL patterns, HTTP methods, auth requirements, and request/response shapes. If you are adding a new endpoint, follow the conventions established here. |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | The data fetching philosophy (`fields`, `include`, Opinionated Packets), sub-resource patterns, mutation conventions, routing structure, and the Controller → Service → Schema separation.                                                 |
 
 **The short version:**
 
@@ -243,25 +237,25 @@ Before writing any new route, service, or controller, read the documentation in 
 
 Route documentation is auto-generated from the Valibot schemas using `hono-openapi`. Once the server is running, you can access the interactive docs:
 
-* **OpenAPI spec:** `GET /openapi`
-* **Scalar UI (Interactive Docs):** `GET /docs`
+- **OpenAPI spec:** `GET /openapi`
+- **Scalar UI (Interactive Docs):** `GET /docs`
 
 ## Available Commands
 
 We use a `Makefile` to simplify Docker and database operations.
 
-| Command | Description |
-| --- | --- |
-| `make dev` | Run the full stack with Docker and hot reload |
-| `make infra` | Start only PostgreSQL and Redis (to run API locally via Bun) |
-| `make down` | Stop all running containers |
-| `make nuke` | Stop containers and wipe all persistent data volumes |
-| `make db` | Open a PostgreSQL interactive shell |
-| `make redis` | Open a Redis interactive CLI |
-| `make logs` | Follow API container logs |
-| `make migrate` | Run Drizzle database migrations |
-| `make seed` | Run the database seed script |
-| `make fresh` | Nuke containers -> run migrations -> run seed |
+| Command        | Description                                                  |
+| -------------- | ------------------------------------------------------------ |
+| `make dev`     | Run the full stack with Docker and hot reload                |
+| `make infra`   | Start only PostgreSQL and Redis (to run API locally via Bun) |
+| `make down`    | Stop all running containers                                  |
+| `make nuke`    | Stop containers and wipe all persistent data volumes         |
+| `make db`      | Open a PostgreSQL interactive shell                          |
+| `make redis`   | Open a Redis interactive CLI                                 |
+| `make logs`    | Follow API container logs                                    |
+| `make migrate` | Run Drizzle database migrations                              |
+| `make seed`    | Run the database seed script                                 |
+| `make fresh`   | Nuke containers -> run migrations -> run seed                |
 
 ## Contributing
 

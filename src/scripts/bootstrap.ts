@@ -10,12 +10,9 @@ async function bootstrap() {
   }
 
   if (!maintenanceDb) {
-    console.error(
-      "MAINTENANCE_DB is missing! Please set it in your environment (e.g., MAINTENANCE_DB=postgres)",
-    );
+    console.error("MAINTENANCE_DB is missing! Please set it in your environment (e.g., MAINTENANCE_DB=postgres)");
     process.exit(1);
   }
-
 
   const useSsl = process.env.DB_USE_SSL === "true";
   const sslConfig = useSsl ? { rejectUnauthorized: false } : false;
@@ -23,13 +20,10 @@ async function bootstrap() {
   const urlObj = new URL(targetUrl);
   const targetDbName = urlObj.pathname.split("/")[1];
 
-
   urlObj.pathname = `/${maintenanceDb}`;
   const maintenanceUrl = urlObj.toString();
 
-  console.log(
-    `Connecting to administrative DB "${maintenanceDb}" to check for "${targetDbName}"...`,
-  );
+  console.log(`Connecting to administrative DB "${maintenanceDb}" to check for "${targetDbName}"...`);
 
   const maintenanceClient = new Client({
     connectionString: maintenanceUrl,
@@ -39,10 +33,7 @@ async function bootstrap() {
   try {
     await maintenanceClient.connect();
 
-    const checkRes = await maintenanceClient.query(
-      `SELECT 1 FROM pg_database WHERE datname = $1`,
-      [targetDbName],
-    );
+    const checkRes = await maintenanceClient.query(`SELECT 1 FROM pg_database WHERE datname = $1`, [targetDbName]);
 
     if (checkRes.rowCount === 0) {
       console.log(`Database "${targetDbName}" missing. Creating it...`);

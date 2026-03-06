@@ -1,14 +1,14 @@
 import {
-    pgTable,
-    varchar,
-    text,
-    jsonb,
-    timestamp,
-    integer,
-    decimal,
-    real,
-    index,
-    bigserial,
+  pgTable,
+  varchar,
+  text,
+  jsonb,
+  timestamp,
+  integer,
+  decimal,
+  real,
+  index,
+  bigserial,
 } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { posts } from "./posts";
@@ -27,58 +27,55 @@ import { posts } from "./posts";
 //   - Or coerce to string before sending: { ...row, id: row.id.toString() }
 // ============================================================================
 
-
-export const interactions = pgTable("interactions", {
+export const interactions = pgTable(
+  "interactions",
+  {
     id: bigserial("id", { mode: "bigint" }).primaryKey(),
     userId: integer("user_id")
-        .notNull()
-        .references(() => users.id, { onDelete: "cascade" }),
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     module: varchar("module", { length: 50 }).notNull(),
     type: varchar("type", { length: 255 }).notNull(),
     targetId: integer("target_id").notNull(),
     targetType: varchar("target_type", { length: 50 }).default("post"),
     interactionWeight: decimal("interaction_weight", {
-        precision: 16,
-        scale: 8,
+      precision: 16,
+      scale: 8,
     }).notNull(),
     value: decimal("value", { precision: 16, scale: 8 }).notNull(),
     interactorReward: decimal("interactor_reward", {
-        precision: 16,
-        scale: 8,
+      precision: 16,
+      scale: 8,
     }).notNull(),
     metadata: jsonb("metadata"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-        .defaultNow()
-        .notNull(),
-},
-    (table) => [
-        index("interactions_user_id_idx").on(table.userId),
-        index("interactions_module_type_idx").on(table.module, table.type),
-        index("interactions_target_idx").on(table.targetId, table.targetType),
-        index("interactions_created_at_idx").on(table.createdAt),
-    ]
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("interactions_user_id_idx").on(table.userId),
+    index("interactions_module_type_idx").on(table.module, table.type),
+    index("interactions_target_idx").on(table.targetId, table.targetType),
+    index("interactions_created_at_idx").on(table.createdAt),
+  ],
 );
 
-
-export const readingSessions = pgTable("reading_sessions", {
+export const readingSessions = pgTable(
+  "reading_sessions",
+  {
     id: bigserial("id", { mode: "bigint" }).primaryKey(),
     postId: integer("post_id")
-        .notNull()
-        .references(() => posts.id, { onDelete: "cascade" }),
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
     userId: integer("user_id")
-        .notNull()
-        .references(() => users.id, { onDelete: "cascade" }),
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     status: varchar("status", { length: 50 }).notNull(),
     totalTimeToReadSec: real("total_time_to_read_sec").notNull(),
     userSpentTimeSec: real("user_spent_time_sec").notNull(),
     completionRatio: real("completion_ratio").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-        .defaultNow()
-        .notNull(),
-},
-    (table) => [
-        index("reading_sessions_post_id_idx").on(table.postId),
-        index("reading_sessions_user_id_idx").on(table.userId),
-    ]
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("reading_sessions_post_id_idx").on(table.postId),
+    index("reading_sessions_user_id_idx").on(table.userId),
+  ],
 );
-
