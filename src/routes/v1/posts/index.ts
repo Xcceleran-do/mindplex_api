@@ -193,6 +193,8 @@ app.delete("/:identifier", guard("admin"), deletePostDocs, validator("param", Po
 
 // /post/:identifier/comments
 app.route("/:identifier/comments", postComments);
-// /post/
-app.route("/", postInteractions);
+
+// /post/:identifier/interactions
+app.route("/:identifier", postInteractions);
+
 export default app;

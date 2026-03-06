@@ -283,12 +283,12 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.posts.authorId,
       to: r.users.id,
     }),
-    // 🔥 NEW M2M SYNTAX
+
     coAuthors: r.many.users({
       from: r.posts.id.through(r.postAuthors.postId),
       to: r.users.id.through(r.postAuthors.userId),
     }),
-    // 🔥 NEW M2M SYNTAX: Replaced postTaxonomies so you can query direct
+
     taxonomies: r.many.taxonomies({
       from: r.posts.id.through(r.postTaxonomies.postId),
       to: r.taxonomies.id.through(r.postTaxonomies.taxonomyId),
@@ -323,6 +323,36 @@ export const relations = defineRelations(schema, (r) => ({
   interactions: {
     user: r.one.users({
       from: r.interactions.userId,
+      to: r.users.id,
+    }),
+  },
+  postEmojis: {
+    post: r.one.posts({
+      from: r.postEmojis.postId,
+      to: r.posts.id,
+    }),
+    user: r.one.users({
+      from: r.postEmojis.userId,
+      to: r.users.id,
+    }),
+  },
+  shares: {
+    post: r.one.posts({
+      from: r.shares.postId,
+      to: r.posts.id,
+    }),
+    user: r.one.users({
+      from: r.shares.userId,
+      to: r.users.id,
+    }),
+  },
+  peoplesChoiceVotes: {
+    post: r.one.posts({
+      from: r.peoplesChoiceVotes.postId,
+      to: r.posts.id,
+    }),
+    user: r.one.users({
+      from: r.peoplesChoiceVotes.userId,
       to: r.users.id,
     }),
   },
@@ -405,7 +435,6 @@ export const relations = defineRelations(schema, (r) => ({
       to: r.taxonomies.parentId,
       alias: "taxonomyHierarchy",
     }),
-    // 🔥 NEW M2M SYNTAX: Replaced postTaxonomies
     posts: r.many.posts({
       from: r.taxonomies.id.through(r.postTaxonomies.taxonomyId),
       to: r.posts.id.through(r.postTaxonomies.postId),
