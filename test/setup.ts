@@ -12,6 +12,12 @@ import {
   REACTIONS,
   PEOPLES_CHOICE_VOTES,
 } from "./seed";
+import {
+  INTERESTS,
+  EDUCATION,
+  WALLETS,
+  FRIEND_REQUESTS,
+} from "./seed";
 
 const BASE = "http://localhost:3000";
 
@@ -41,6 +47,10 @@ export type SeededData = {
     pending: TestComment;
     replies: TestComment[];
   };
+  interests: { id: number; userId: number; interest: string }[];
+  education: { id: number; userId: number }[];
+  wallets: { id: number; userId: number; publicAddress: string | null }[];
+  friendRequests: { id: number; requesterId: number; requestedId: number; status: string }[];
 };
 
 // ─── User Creation ──────────────────────────────────────
@@ -71,6 +81,10 @@ export async function asRole(role: Role): Promise<TestUser> {
       .values({ username, email, passwordHash: hash, role, isActivated: true })
       .returning({ id: schema.users.id });
   }
+
+  await db.insert(schema.userProfiles).values({ userId: user.id }).onConflictDoNothing();
+  await db.insert(schema.userPreferences).values({ userId: user.id }).onConflictDoNothing();
+  await db.insert(schema.userNotificationSettings).values({ userId: user.id }).onConflictDoNothing();
 
   const token = await generateAccessToken({
     sub: String(user.id),
@@ -115,53 +129,29 @@ export async function seed(): Promise<SeededData> {
 
   const postsBySlug = Object.fromEntries(posts.map((p) => [p.slug, p]));
 
-  // 3. Comments (inserted in order so parent refs resolve)
+  // 3. Comments
   const commentsByKey: Record<string, TestComment> = {};
-
-  // Root comments first, then replies
-  const roots = COMMENTS.filter((c) => !c.parentKey);
-  const replies = COMMENTS.filter((c) => c.parentKey);
-
-  for (const c of roots) {
-    const post = postsBySlug[c.postSlug];
-    const [inserted] = await db
-      .insert(schema.comments)
-      .values({
-        postId: post.id,
-        authorId: usersByRole[c.authorRole].id,
-        content: c.content,
-        status: c.status,
-      })
-      .returning({
-        id: schema.comments.id,
-        postId: schema.comments.postId,
-        authorId: schema.comments.authorId,
-      });
-
-    commentsByKey[c.key] = inserted as TestComment;
-  }
-
   const replyRecords: TestComment[] = [];
-  for (const c of replies) {
-    const post = postsBySlug[c.postSlug];
-    const parent = commentsByKey[c.parentKey!];
-    const [inserted] = await db
+
+  for (const fixture of COMMENTS) {
+    const post = postsBySlug[fixture.postSlug];
+    const parentId = fixture.parentKey ? commentsByKey[fixture.parentKey]?.id : undefined;
+
+    const [row] = await db
       .insert(schema.comments)
       .values({
         postId: post.id,
-        authorId: usersByRole[c.authorRole].id,
-        content: c.content,
-        status: c.status,
-        parentId: parent.id,
+        authorId: usersByRole[fixture.authorRole].id,
+        content: fixture.content,
+        status: fixture.status,
+        parentId,
       })
-      .returning({
-        id: schema.comments.id,
-        postId: schema.comments.postId,
-        authorId: schema.comments.authorId,
-        parentId: schema.comments.parentId,
-      });
+      .returning({ id: schema.comments.id, postId: schema.comments.postId, authorId: schema.comments.authorId });
 
-    replyRecords.push({ ...inserted, parentId: inserted.parentId! } as TestComment);
+    const record: TestComment = { ...row, parentId };
+    commentsByKey[fixture.key] = record;
+
+    if (fixture.parentKey) replyRecords.push(record as TestComment);
   }
 
   // 4. Reactions
@@ -183,6 +173,60 @@ export async function seed(): Promise<SeededData> {
     await db.insert(schema.peoplesChoiceVotes).values(voteValues);
   }
 
+  // 6. User Interests
+  const interests = [];
+  for (const fixture of INTERESTS) {
+    const [row] = await db
+      .insert(schema.userInterests)
+      .values({
+        userId: usersByRole[fixture.userRole].id,
+        interest: fixture.interest,
+        isPrimary: fixture.isPrimary,
+      })
+      .returning();
+    interests.push(row);
+  }
+
+  // 7. User Education
+  const education = [];
+  for (const fixture of EDUCATION) {
+    const [row] = await db
+      .insert(schema.userEducation)
+      .values({
+        userId: usersByRole[fixture.userRole].id,
+        educationalBackground: fixture.educationalBackground,
+      })
+      .returning();
+    education.push(row);
+  }
+
+  // 8. Wallets
+  const wallets = [];
+  for (const fixture of WALLETS) {
+    const [row] = await db
+      .insert(schema.userWallets)
+      .values({
+        userId: usersByRole[fixture.userRole].id,
+        publicAddress: fixture.publicAddress,
+      })
+      .returning();
+    wallets.push(row);
+  }
+
+  // 9. Friend Requests
+  const friendRequests = [];
+  for (const fixture of FRIEND_REQUESTS) {
+    const [row] = await db
+      .insert(schema.friendRequests)
+      .values({
+        requesterId: usersByRole[fixture.requesterRole].id,
+        requestedId: usersByRole[fixture.requestedRole].id,
+        status: fixture.status,
+      })
+      .returning();
+    friendRequests.push(row);
+  }
+
   return {
     users,
     posts,
@@ -192,12 +236,25 @@ export async function seed(): Promise<SeededData> {
       pending: commentsByKey["pending"],
       replies: replyRecords,
     },
+    interests,
+    education,
+    wallets,
+    friendRequests,
   };
 }
 
 // ─── Cleanup ────────────────────────────────────────────
 
 export async function cleanup() {
+  // Collect test user IDs for user-scoped cleanup
+  const testUserIds = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(like(schema.users.username, `${TEST_PREFIX}%`));
+
+  const userIds = testUserIds.map((u) => u.id);
+
+  // Post-scoped cleanup
   const testPostIds = await db
     .select({ id: schema.posts.id })
     .from(schema.posts)
@@ -213,6 +270,20 @@ export async function cleanup() {
   }
 
   await db.delete(schema.posts).where(like(schema.posts.slug, `${TEST_PREFIX}%`));
+
+  // User-scoped cleanup
+  if (userIds.length > 0) {
+    await db.delete(schema.userInterests).where(inArray(schema.userInterests.userId, userIds));
+    await db.delete(schema.userEducation).where(inArray(schema.userEducation.userId, userIds));
+    await db.delete(schema.userWallets).where(inArray(schema.userWallets.userId, userIds));
+    await db.delete(schema.friendRequests).where(inArray(schema.friendRequests.requesterId, userIds));
+    await db.delete(schema.friendRequests).where(inArray(schema.friendRequests.requestedId, userIds));
+    await db.delete(schema.userSocialAuths).where(inArray(schema.userSocialAuths.userId, userIds));
+    await db.delete(schema.userNotificationSettings).where(inArray(schema.userNotificationSettings.userId, userIds));
+    await db.delete(schema.userPreferences).where(inArray(schema.userPreferences.userId, userIds));
+    await db.delete(schema.userProfiles).where(inArray(schema.userProfiles.userId, userIds));
+  }
+
   await db.delete(schema.users).where(like(schema.users.username, `${TEST_PREFIX}%`));
   tokenCache.clear();
 }

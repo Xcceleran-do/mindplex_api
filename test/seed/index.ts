@@ -188,3 +188,54 @@ export const PEOPLES_CHOICE_VOTES: PeoplesChoiceFixture[] = [
     // popular-article gets 1 vote
     { postSlug: `${TEST_PREFIX}popular-article`, userRole: "user" },
 ];
+
+// ─── Interests ──────────────────────────────────────────
+
+export type InterestFixture = {
+    userRole: "user" | "editor";
+    interest: string;
+    isPrimary: boolean;
+};
+
+export const INTERESTS: InterestFixture[] = [
+    { userRole: "user", interest: "Artificial Intelligence", isPrimary: true },
+    { userRole: "user", interest: "Blockchain", isPrimary: false },
+    { userRole: "editor", interest: "Neuroscience", isPrimary: true },
+];
+
+// ─── Education ──────────────────────────────────────────
+
+export type EducationFixture = {
+    userRole: "user" | "editor";
+    educationalBackground: string;
+};
+
+export const EDUCATION: EducationFixture[] = [
+    { userRole: "user", educationalBackground: "MSc Computer Science" },
+    { userRole: "user", educationalBackground: "BSc Mathematics" },
+    { userRole: "editor", educationalBackground: "PhD Cognitive Science" },
+];
+
+// ─── Wallets ────────────────────────────────────────────
+
+export type WalletFixture = {
+    userRole: "user";
+    publicAddress: string;
+};
+
+export const WALLETS: WalletFixture[] = [
+    { userRole: "user", publicAddress: `${TEST_PREFIX}0xabc123def456` },
+];
+
+// ─── Friend Requests ────────────────────────────────────
+
+export type FriendRequestFixture = {
+    requesterRole: "user" | "editor" | "admin";
+    requestedRole: "user" | "editor" | "admin";
+    status: "pending" | "accepted" | "rejected";
+};
+
+export const FRIEND_REQUESTS: FriendRequestFixture[] = [
+    { requesterRole: "editor", requestedRole: "user", status: "pending" },
+    { requesterRole: "admin", requestedRole: "user", status: "accepted" },
+];
