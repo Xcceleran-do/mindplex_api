@@ -1,7 +1,7 @@
 import * as v from "valibot";
 import { createFieldsSchema, createIncludesSchema, getAllowedFields } from "$src/utils";
 import { PaginationLimitSchema, PaginationPageSchema } from "$src/lib/validators";
-import { posts } from "$src/db/schema";
+import { POST_TYPE, posts } from "$src/db/schema";
 import { getColumns } from "drizzle-orm";
 import { describeRoute, resolver } from "hono-openapi";
 
@@ -9,7 +9,7 @@ const postsCol = getColumns(posts);
 type PostColumn = keyof typeof postsCol;
 
 export const FORBIDDEN_COLUMNS = new Set<PostColumn>(["commentEnabled"]);
-export const ALLOWED_INCLUDES = ["authors", "categories", "tags", "reputation"];
+export const ALLOWED_INCLUDES = ["authors", "categories", "stats"];
 
 export const UPDATABLE_FIELDS = new Set([
   "title",
@@ -21,6 +21,7 @@ export const UPDATABLE_FIELDS = new Set([
   "estimatedReadingMinutes",
   "publishedAt",
 ]);
+const POST_TYPE_VALUES = Object.values(POST_TYPE);
 
 export const PostIdentifierParamSchema = v.object({
   identifier: v.pipe(v.string(), v.minLength(1), v.maxLength(255)),
@@ -31,12 +32,17 @@ export const PostListQuerySchema = v.object({
   page: PaginationPageSchema,
   fields: createFieldsSchema(posts, FORBIDDEN_COLUMNS),
   include: createIncludesSchema(ALLOWED_INCLUDES),
+  type: v.optional(v.picklist(POST_TYPE_VALUES)),
+  sort: v.optional(v.picklist(["all", "recent", "popular", "trending"]), "all"),
+  feed: v.optional(v.picklist(["editors-pick", "peoples-choice"])),
 });
 
 export const PostDetailsQuerySchema = v.object({
   fields: createFieldsSchema(posts, FORBIDDEN_COLUMNS),
   include: createIncludesSchema(ALLOWED_INCLUDES),
 });
+
+
 
 // ─── Body Schemas ───────────────────────────────────────────
 
@@ -99,7 +105,19 @@ const fieldsList = getAllowedFields(posts, FORBIDDEN_COLUMNS).join(", ");
 export const postListDocs = describeRoute({
   tags: ["Posts"],
   summary: "List Posts",
-  description: `Paginated list. Includes: ${ALLOWED_INCLUDES.join(", ")}. Fields: ${fieldsList}`,
+  description: [
+    `Paginated post listing. Always filters by status=published.`,
+    ``,
+    `**Filters:** type (${POST_TYPE_VALUES.join(", ")})`,
+    ``,
+    `**Sort:** all (time-decayed engagement), recent (publishedAt DESC), popular (like_count DESC), trending (reserved for recommendation system)`,
+    ``,
+    `**Feeds:** editors-pick (single featured post), peoples-choice (ordered by vote count). Feed overrides sort.`,
+    ``,
+    `**Includes:** ${ALLOWED_INCLUDES.join(", ")}. Stats auto-included when sort=all, sort=popular, or feed=peoples-choice.`,
+    ``,
+    `**Fields:** ${fieldsList}`,
+  ].join("\n"),
   responses: {
     200: {
       description: "OK",

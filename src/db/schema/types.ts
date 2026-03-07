@@ -64,10 +64,12 @@ export const POST_STATUS = {
 
 export const POST_TYPE = {
   Article: "article",
-  News: "news",
-  Page: "page",
   Podcast: "podcast",
+  News: "news",
   Video: "video",
+  Community: "community",
+  Topics: "topics",
+  Mindbytes: "mindbytes",
 } as const;
 
 // --- Comments ---

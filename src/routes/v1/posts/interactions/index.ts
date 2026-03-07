@@ -55,7 +55,6 @@ const REACTION_INCLUDES: Record<string, IncludeConfig<"postReactions">> = {
   user: { requiredRole: ACCESS.Public, drizzleWith: USER_DRIZZLE_WITH },
 } as const;
 
-
 const EMOJI_INCLUDES: Record<string, IncludeConfig<"postEmojis">> = {
   user: { requiredRole: ACCESS.Public, drizzleWith: USER_DRIZZLE_WITH },
 } as const;
@@ -65,7 +64,6 @@ const BOOKMARK_INCLUDES: Record<string, IncludeConfig<"bookmarks">> = {
 } as const;
 
 const SHARE_INCLUDES: Record<string, IncludeConfig<"shares">> = {
-
   user: { requiredRole: ACCESS.Public, drizzleWith: USER_DRIZZLE_WITH },
 } as const;
 
