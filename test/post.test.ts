@@ -11,7 +11,6 @@ afterAll(async () => {
   await cleanup();
 });
 
-// ─── GET /v1/posts ──────────────────────────────────────
 
 describe("GET /v1/posts", () => {
   it("returns a list of posts", async () => {
@@ -59,8 +58,6 @@ describe("GET /v1/posts", () => {
   });
 });
 
-// ─── GET /v1/posts/:identifier ──────────────────────────
-
 describe("GET /v1/posts/:identifier", () => {
   it("finds a post by slug", async () => {
     const slug = s.posts[0].slug;
@@ -100,8 +97,6 @@ describe("GET /v1/posts/:identifier", () => {
     expect(res.status).toBe(200);
   });
 });
-
-// ─── POST /v1/posts ─────────────────────────────────────
 
 describe("POST /v1/posts", () => {
   const createdSlugs: string[] = [];
@@ -188,8 +183,6 @@ describe("POST /v1/posts", () => {
   });
 });
 
-// ─── PATCH /v1/posts/:identifier ────────────────────────
-
 describe("PATCH /v1/posts/:identifier", () => {
   it("requires auth", async () => {
     const res = await api.patch(`/v1/posts/${s.posts[0].slug}`, {
@@ -275,7 +268,6 @@ describe("PATCH /v1/posts/:identifier", () => {
   });
 });
 
-// ─── DELETE /v1/posts/:identifier ───────────────────────
 
 describe("DELETE /v1/posts/:identifier", () => {
   it("requires auth", async () => {
@@ -312,5 +304,244 @@ describe("DELETE /v1/posts/:identifier", () => {
     });
 
     expect(res.status).toBe(404);
+  });
+});
+
+
+describe("GET /v1/posts — type filter", () => {
+  it("filters by ?type=news", async () => {
+    const res = await api.get("/v1/posts", { query: { type: "news" } });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.length).toBeGreaterThanOrEqual(1);
+    for (const post of body.data) {
+      expect(post.type).toBe("news");
+    }
+  });
+
+  it("filters by ?type=podcast", async () => {
+    const res = await api.get("/v1/posts", { query: { type: "podcast" } });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.length).toBeGreaterThanOrEqual(1);
+    for (const post of body.data) {
+      expect(post.type).toBe("podcast");
+    }
+  });
+
+  it("rejects invalid type", async () => {
+    const res = await api.get("/v1/posts", { query: { type: "invalid" } });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /v1/posts — status=published default", () => {
+  it("never returns draft posts", async () => {
+    const res = await api.get("/v1/posts", { query: { limit: "100" } });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    for (const post of body.data) {
+      expect(post.status).toBe("published");
+    }
+  });
+
+  it("draft post not returned even with type filter", async () => {
+    const res = await api.get("/v1/posts", { query: { type: "news" } });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const slugs = body.data.map((p: any) => p.slug);
+    expect(slugs).not.toContain("test-draft-hidden");
+  });
+});
+
+describe("GET /v1/posts — sort=recent", () => {
+  it("orders by publishedAt DESC", async () => {
+    const res = await api.get("/v1/posts", { query: { sort: "recent", limit: "50" } });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const dates = body.data.map((p: any) => new Date(p.publishedAt).getTime());
+    for (let i = 1; i < dates.length; i++) {
+      expect(dates[i - 1]).toBeGreaterThanOrEqual(dates[i]);
+    }
+  });
+});
+
+describe("GET /v1/posts — sort=popular", () => {
+  it("orders by like count", async () => {
+    const res = await api.get("/v1/posts", {
+      query: { sort: "popular", include: "stats", limit: "50" },
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const counts = body.data.map((p: any) => p.stats?.likeCount ?? 0);
+    for (let i = 1; i < counts.length; i++) {
+      expect(counts[i - 1]).toBeGreaterThanOrEqual(counts[i]);
+    }
+  });
+
+  it("auto-includes stats without explicit ?include=stats", async () => {
+    const res = await api.get("/v1/posts", { query: { sort: "popular" } });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const withStats = body.data.filter((p: any) => p.stats);
+    expect(withStats.length).toBeGreaterThan(0);
+  });
+});
+
+describe("GET /v1/posts — sort=all (trending)", () => {
+  it("returns results with time-decayed engagement", async () => {
+    const res = await api.get("/v1/posts", { query: { sort: "all" } });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).toBeArray();
+    expect(body.data.length).toBeGreaterThan(0);
+  });
+
+
+});
+
+describe("GET /v1/posts — sort=trending (fallback)", () => {
+  it("falls back to publishedAt DESC", async () => {
+    const res = await api.get("/v1/posts", { query: { sort: "trending", limit: "50" } });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const dates = body.data.map((p: any) => new Date(p.publishedAt).getTime());
+    for (let i = 1; i < dates.length; i++) {
+      expect(dates[i - 1]).toBeGreaterThanOrEqual(dates[i]);
+    }
+  });
+
+  it("rejects invalid sort value", async () => {
+    const res = await api.get("/v1/posts", { query: { sort: "invalid" } });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /v1/posts — feed=editors-pick", () => {
+  it("returns only the editors pick", async () => {
+    const res = await api.get("/v1/posts", { query: { feed: "editors-pick" } });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.length).toBe(1);
+    expect(body.data[0].isEditorsPick).toBe(true);
+  });
+
+  it("returns the correct post", async () => {
+    const res = await api.get("/v1/posts", { query: { feed: "editors-pick" } });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data[0].slug).toBe("test-editors-pick");
+  });
+});
+
+describe("GET /v1/posts — feed=peoples-choice", () => {
+  it("orders by vote count", async () => {
+    const res = await api.get("/v1/posts", {
+      query: { feed: "peoples-choice", include: "stats" },
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const counts = body.data.map((p: any) => p.stats?.peoplesChoiceCount ?? 0);
+    for (let i = 1; i < counts.length; i++) {
+      expect(counts[i - 1]).toBeGreaterThanOrEqual(counts[i]);
+    }
+  });
+
+  it("auto-includes stats", async () => {
+    const res = await api.get("/v1/posts", { query: { feed: "peoples-choice" } });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const withStats = body.data.filter((p: any) => p.stats);
+    expect(withStats.length).toBeGreaterThan(0);
+  });
+
+  it("rejects invalid feed value", async () => {
+    const res = await api.get("/v1/posts", { query: { feed: "invalid" } });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /v1/posts — ?include=stats", () => {
+  it("returns all engagement count fields", async () => {
+    const res = await api.get("/v1/posts", { query: { include: "stats" } });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const withStats = body.data.filter((p: any) => p.stats);
+    expect(withStats.length).toBeGreaterThan(0);
+
+    const stat = withStats[0].stats;
+    expect(stat).toHaveProperty("likeCount");
+    expect(stat).toHaveProperty("dislikeCount");
+    expect(stat).toHaveProperty("commentCount");
+    expect(stat).toHaveProperty("shareCount");
+    expect(stat).toHaveProperty("bookmarkCount");
+    expect(stat).toHaveProperty("peoplesChoiceCount");
+  });
+});
+
+describe("GET /v1/posts — combined params", () => {
+  it("type + sort combine correctly", async () => {
+    const res = await api.get("/v1/posts", {
+      query: { type: "article", sort: "popular", include: "stats" },
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    for (const post of body.data) {
+      expect(post.type).toBe("article");
+    }
+    const counts = body.data.map((p: any) => p.stats?.likeCount ?? 0);
+    for (let i = 1; i < counts.length; i++) {
+      expect(counts[i - 1]).toBeGreaterThanOrEqual(counts[i]);
+    }
+  });
+
+  it("type + feed combine correctly", async () => {
+    const res = await api.get("/v1/posts", {
+      query: { type: "article", feed: "peoples-choice", include: "stats" },
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    for (const post of body.data) {
+      expect(post.type).toBe("article");
+    }
+  });
+});
+
+describe("GET /v1/posts — trigger verification", () => {
+  it("reactions reflected in post_stats", async () => {
+    const res = await api.get("/v1/posts", { query: { include: "stats", limit: "100" } });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const popular = body.data.find((p: any) => p.slug === "test-popular-article");
+    expect(popular).toBeDefined();
+    expect(popular.stats).toBeDefined();
+    expect(popular.stats.likeCount).toBeGreaterThanOrEqual(3);
+  });
+
+  it("peoples-choice votes reflected in post_stats", async () => {
+    const res = await api.get("/v1/posts", { query: { include: "stats", limit: "100" } });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const news = body.data.find((p: any) => p.slug === "test-news-post");
+    expect(news).toBeDefined();
+    expect(news.stats.peoplesChoiceCount).toBeGreaterThanOrEqual(3);
   });
 });

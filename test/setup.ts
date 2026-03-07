@@ -1,19 +1,23 @@
-/**
- * Test setup and helpers.
- */
-
 import { generateAccessToken } from "$src/lib/jwt";
 import { db } from "$src/db/client";
 import * as schema from "$src/db/schema";
 import { eq, inArray, like } from "drizzle-orm";
 import type { Role } from "$src/db/schema/types";
 import app from "$src/index";
+import {
+  TEST_PREFIX,
+  USER_ROLES,
+  POSTS,
+  COMMENTS,
+  REACTIONS,
+  PEOPLES_CHOICE_VOTES,
+} from "./seed";
 
 const BASE = "http://localhost:3000";
 
-const TEST_PREFIX = "test-";
+// ─── Types ──────────────────────────────────────────────
 
-type TestUser = {
+export type TestUser = {
   id: number;
   token: string;
   email: string;
@@ -27,6 +31,19 @@ type TestComment = {
   authorId: number;
   parentId?: number;
 };
+
+export type SeededData = {
+  users: Record<"admin" | "editor" | "moderator" | "user", TestUser>;
+  posts: { id: number; slug: string; authorId: number }[];
+  comments: {
+    byUser: TestComment;
+    byEditor: TestComment;
+    pending: TestComment;
+    replies: TestComment[];
+  };
+};
+
+// ─── User Creation ──────────────────────────────────────
 
 const tokenCache = new Map<string, TestUser>();
 
@@ -51,13 +68,7 @@ export async function asRole(role: Role): Promise<TestUser> {
     });
     [user] = await db
       .insert(schema.users)
-      .values({
-        username,
-        email,
-        passwordHash: hash,
-        role,
-        isActivated: true,
-      })
+      .values({ username, email, passwordHash: hash, role, isActivated: true })
       .returning({ id: schema.users.id });
   }
 
@@ -73,141 +84,118 @@ export async function asRole(role: Role): Promise<TestUser> {
   return testUser;
 }
 
-export type SeededData = {
-  users: {
-    admin: TestUser;
-    editor: TestUser;
-    moderator: TestUser;
-    user: TestUser;
-  };
-  posts: { id: number; slug: string; authorId: number }[];
-  comments: {
-    byUser: TestComment;
-    byEditor: TestComment;
-    pending: TestComment;
-    replies: TestComment[];
-  };
-};
+// ─── Seed ───────────────────────────────────────────────
 
 export async function seed(): Promise<SeededData> {
-  const admin = await asRole("admin");
-  const editor = await asRole("editor");
-  const moderator = await asRole("moderator");
-  const user = await asRole("user");
+  // 1. Users
+  const [admin, editor, moderator, user] = await Promise.all(
+    USER_ROLES.map((role) => asRole(role)),
+  );
+  const users = { admin, editor, moderator, user };
+  const usersByRole: Record<string, TestUser> = users;
 
-  // Seed posts
-  const postData = [
-    {
-      authorId: editor.id,
-      title: "Test Commentable Post",
-      slug: `${TEST_PREFIX}comment-post`,
-      status: "published" as const,
-      type: "article" as const,
-      content: "Post with comments",
-      commentEnabled: true,
-    },
-    {
-      authorId: editor.id,
-      title: "Test Comments Disabled",
-      slug: `${TEST_PREFIX}no-comments-post`,
-      status: "published" as const,
-      type: "article" as const,
-      content: "Comments disabled",
-      commentEnabled: false,
-    },
-    {
-      authorId: admin.id,
-      title: "Test Draft Post",
-      slug: `${TEST_PREFIX}draft-post`,
-      status: "draft" as const,
-      type: "article" as const,
-      content: "Draft content",
-    },
-  ];
+  // 2. Posts
+  const postValues = POSTS.map((p) => ({
+    authorId: usersByRole[p.authorRole].id,
+    title: p.title,
+    slug: p.slug,
+    status: p.status,
+    type: p.type,
+    content: p.content,
+    commentEnabled: p.commentEnabled,
+    isEditorsPick: p.isEditorsPick,
+    publishedAt: p.publishedAt,
+  }));
 
-  const posts = await db.insert(schema.posts).values(postData).returning({
+  const posts = await db.insert(schema.posts).values(postValues).returning({
     id: schema.posts.id,
     slug: schema.posts.slug,
     authorId: schema.posts.authorId,
   });
 
-  const commentablePostId = posts[0].id;
+  const postsBySlug = Object.fromEntries(posts.map((p) => [p.slug, p]));
 
-  // Root comment by user (approved)
-  const [byUser] = await db
-    .insert(schema.comments)
-    .values({
-      postId: commentablePostId,
-      authorId: user.id,
-      content: "Approved comment by user",
-      status: "approved",
-    })
-    .returning({
-      id: schema.comments.id,
-      postId: schema.comments.postId,
-      authorId: schema.comments.authorId,
-    });
+  // 3. Comments (inserted in order so parent refs resolve)
+  const commentsByKey: Record<string, TestComment> = {};
 
-  // Root comment by editor (approved)
-  const [byEditor] = await db
-    .insert(schema.comments)
-    .values({
-      postId: commentablePostId,
-      authorId: editor.id,
-      content: "Approved comment by editor",
-      status: "approved",
-    })
-    .returning({
-      id: schema.comments.id,
-      postId: schema.comments.postId,
-      authorId: schema.comments.authorId,
-    });
+  // Root comments first, then replies
+  const roots = COMMENTS.filter((c) => !c.parentKey);
+  const replies = COMMENTS.filter((c) => c.parentKey);
 
-  // Root comment (pending — awaiting moderation)
-  const [pending] = await db
-    .insert(schema.comments)
-    .values({
-      postId: commentablePostId,
-      authorId: user.id,
-      content: "Pending comment awaiting moderation",
-      status: "pending",
-    })
-    .returning({
-      id: schema.comments.id,
-      postId: schema.comments.postId,
-      authorId: schema.comments.authorId,
-    });
+  for (const c of roots) {
+    const post = postsBySlug[c.postSlug];
+    const [inserted] = await db
+      .insert(schema.comments)
+      .values({
+        postId: post.id,
+        authorId: usersByRole[c.authorRole].id,
+        content: c.content,
+        status: c.status,
+      })
+      .returning({
+        id: schema.comments.id,
+        postId: schema.comments.postId,
+        authorId: schema.comments.authorId,
+      });
 
-  // Multiple replies to the editor's comment (for pagination testing)
-  const replyValues = Array.from({ length: 5 }, (_, i) => ({
-    postId: commentablePostId,
-    authorId: user.id,
-    parentId: byEditor.id,
-    content: `Reply ${i + 1} to editor`,
-    status: "approved" as const,
-  }));
+    commentsByKey[c.key] = inserted as TestComment;
+  }
 
-  const replies = await db.insert(schema.comments).values(replyValues).returning({
-    id: schema.comments.id,
-    postId: schema.comments.postId,
-    authorId: schema.comments.authorId,
-    parentId: schema.comments.parentId,
-  });
+  const replyRecords: TestComment[] = [];
+  for (const c of replies) {
+    const post = postsBySlug[c.postSlug];
+    const parent = commentsByKey[c.parentKey!];
+    const [inserted] = await db
+      .insert(schema.comments)
+      .values({
+        postId: post.id,
+        authorId: usersByRole[c.authorRole].id,
+        content: c.content,
+        status: c.status,
+        parentId: parent.id,
+      })
+      .returning({
+        id: schema.comments.id,
+        postId: schema.comments.postId,
+        authorId: schema.comments.authorId,
+        parentId: schema.comments.parentId,
+      });
+
+    replyRecords.push({ ...inserted, parentId: inserted.parentId! } as TestComment);
+  }
+
+  // 4. Reactions
+  if (REACTIONS.length > 0) {
+    const reactionValues = REACTIONS.map((r) => ({
+      postId: postsBySlug[r.postSlug].id,
+      userId: usersByRole[r.userRole].id,
+      reaction: r.reaction,
+    }));
+    await db.insert(schema.postReactions).values(reactionValues);
+  }
+
+  // 5. People's Choice Votes
+  if (PEOPLES_CHOICE_VOTES.length > 0) {
+    const voteValues = PEOPLES_CHOICE_VOTES.map((v) => ({
+      postId: postsBySlug[v.postSlug].id,
+      userId: usersByRole[v.userRole].id,
+    }));
+    await db.insert(schema.peoplesChoiceVotes).values(voteValues);
+  }
 
   return {
-    users: { admin, editor, moderator, user },
+    users,
     posts,
     comments: {
-      byUser: byUser as TestComment,
-      byEditor: byEditor as TestComment,
-      pending: pending as TestComment,
-      replies: replies.map((r) => ({
-        ...r,
-        parentId: r.parentId!,
-      })) as TestComment[],
+      byUser: commentsByKey["byUser"],
+      byEditor: commentsByKey["byEditor"],
+      pending: commentsByKey["pending"],
+      replies: replyRecords,
     },
   };
 }
+
+// ─── Cleanup ────────────────────────────────────────────
 
 export async function cleanup() {
   const testPostIds = await db
@@ -215,19 +203,21 @@ export async function cleanup() {
     .from(schema.posts)
     .where(like(schema.posts.slug, `${TEST_PREFIX}%`));
 
-  if (testPostIds.length > 0) {
-    await db.delete(schema.comments).where(
-      inArray(
-        schema.comments.postId,
-        testPostIds.map((p) => p.id),
-      ),
-    );
+  const ids = testPostIds.map((p) => p.id);
+
+  if (ids.length > 0) {
+    await db.delete(schema.postReactions).where(inArray(schema.postReactions.postId, ids));
+    await db.delete(schema.peoplesChoiceVotes).where(inArray(schema.peoplesChoiceVotes.postId, ids));
+    await db.delete(schema.postStats).where(inArray(schema.postStats.postId, ids));
+    await db.delete(schema.comments).where(inArray(schema.comments.postId, ids));
   }
 
   await db.delete(schema.posts).where(like(schema.posts.slug, `${TEST_PREFIX}%`));
   await db.delete(schema.users).where(like(schema.users.username, `${TEST_PREFIX}%`));
   tokenCache.clear();
 }
+
+// ─── API Client ─────────────────────────────────────────
 
 type RequestOptions = {
   body?: Record<string, any>;

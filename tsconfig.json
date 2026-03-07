@@ -2,6 +2,9 @@
   "compilerOptions": {
     "strict": true,
     "jsx": "react-jsx",
+    "target": "esnext",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "jsxImportSource": "hono/jsx",
     "paths": {
       "$src/*": ["./src/*"],

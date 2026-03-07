@@ -283,6 +283,10 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.posts.authorId,
       to: r.users.id,
     }),
+    stats: r.one.postStats({
+      from: r.posts.id,
+      to: r.postStats.postId,
+    }),
 
     coAuthors: r.many.users({
       from: r.posts.id.through(r.postAuthors.postId),
@@ -304,7 +308,12 @@ export const relations = defineRelations(schema, (r) => ({
       to: r.users.id,
     }),
   },
-
+  postStats: {
+    post: r.one.posts({
+      from: r.postStats.postId,
+      to: r.posts.id,
+    }),
+  },
   // ***************** profiles *****************
   userInterests: {
     user: r.one.users({

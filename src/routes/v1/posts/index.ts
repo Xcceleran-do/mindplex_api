@@ -21,6 +21,7 @@ import { ACCESS } from "$src/db/schema";
 import { guard, isOwnerOrRole } from "$src/middleware/auth";
 import postComments from "./comments";
 import postInteractions from "./interactions";
+import { desc, eq, sql } from "drizzle-orm";
 
 const app = new Hono<AppContext>();
 
@@ -41,22 +42,53 @@ export const POST_INCLUDES: Record<string, IncludeConfig<"posts">> = {
       },
     },
   },
+  stats: {
+    requiredRole: ACCESS.Public,
+    drizzleWith: {
+      stats: true,
+    },
+  },
 } as const;
 
 // GET /post
 app.get("/", guard("optional"), postListDocs, validator("query", PostListQuerySchema), async (c) => {
   const db = c.get("db");
-  const { fields, limit, page, include = [] } = c.req.valid("query");
+  const { fields, limit, page, include = [], type, sort, feed } = c.req.valid("query");
   const userRole = c.get("role");
 
-  const selection = buildFieldSelection(posts, fields, FORBIDDEN_COLUMNS, {
-    id: true,
-  });
-  const relationalWith = buildRelationalWith(include, POST_INCLUDES, userRole);
+  let resolvedIncludes = [...include];
+
+  if (sort === 'popular' || feed === 'peoples-choice') {
+    resolvedIncludes = [...new Set([...include, 'stats'])];
+  }
+
+  const selection = buildFieldSelection(posts, fields, FORBIDDEN_COLUMNS, { id: true });
+  const relationalWith = buildRelationalWith(resolvedIncludes, POST_INCLUDES, userRole);
 
   const data = await db.query.posts.findMany({
     columns: selection,
     with: relationalWith,
+    where: {
+      status: "published",
+      ...(type && { type }),
+      ...(feed === "editors-pick" && { isEditorsPick: true }),
+    },
+    orderBy: (t) => {
+      if (feed === "peoples-choice") {
+        return desc(sql`COALESCE((SELECT peoples_choice_count FROM post_stats WHERE post_id = ${t.id}), 0)`);
+      }
+      if (sort === "popular") {
+        return desc(sql`COALESCE((SELECT like_count FROM post_stats WHERE post_id = ${t.id}), 0)`);
+      }
+      if (sort === "all") {
+        return desc(sql`COALESCE((
+        SELECT (s.like_count * 3 + s.comment_count * 5 + s.share_count * 2 + s.bookmark_count)
+            / POWER(GREATEST(EXTRACT(EPOCH FROM (NOW() - COALESCE(${t.publishedAt}, ${t.createdAt}))) / 3600 + 2, 0.1), 1.5)
+        FROM post_stats s WHERE s.post_id = ${t.id}
+    ), 0)`);
+      }
+      return desc(t.publishedAt);
+    },
     limit,
     offset: (page - 1) * limit,
   });
