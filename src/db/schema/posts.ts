@@ -19,6 +19,7 @@ export const posts = pgTable(
     type: varchar("type", { length: 20 }).$type<PostType>().default("article").notNull(),
     commentEnabled: boolean("comment_enabled").default(true).notNull(),
     originResource: varchar("origin_resource", { length: 50 }),
+    isEditorsPick: boolean("is_editors_pick").default(false).notNull(),
 
     estimatedReadingMinutes: integer("estimated_reading_minutes"),
     viewCount: integer("view_count").default(0).notNull(),
@@ -61,6 +62,18 @@ export const postAuthors = pgTable(
     index("post_authors_user_id_idx").on(table.userId),
   ],
 );
+
+export const postStats = pgTable("post_stats", {
+  postId: integer("post_id")
+    .primaryKey()
+    .references(() => posts.id, { onDelete: "cascade" }),
+  likeCount: integer("like_count").default(0).notNull(),
+  dislikeCount: integer("dislike_count").default(0).notNull(),
+  commentCount: integer("comment_count").default(0).notNull(),
+  shareCount: integer("share_count").default(0).notNull(),
+  bookmarkCount: integer("bookmark_count").default(0).notNull(),
+  peoplesChoiceCount: integer("peoples_choice_count").default(0).notNull(),
+});
 
 // ============================================================================
 // Media (replaces WP attachment post type)

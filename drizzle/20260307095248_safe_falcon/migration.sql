@@ -1,0 +1,1 @@
+ALTER TABLE "posts" ADD COLUMN "is_editors_pick" boolean DEFAULT false NOT NULL;
